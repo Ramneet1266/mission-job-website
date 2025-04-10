@@ -32,7 +32,11 @@ export default function RootLayout({
 				) : (
 					<>
 						{!hideLayout && <Navbar />}
-						{children}
+						<div
+							className={!hideLayout ? "min-h-screen my-[10px]" : ""}
+						>
+							{children}
+						</div>
 						{!hideLayout && <Footer />}
 						{!hideLayout && <WhatsappButton />}
 					</>
