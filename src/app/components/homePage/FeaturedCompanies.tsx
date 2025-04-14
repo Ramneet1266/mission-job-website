@@ -92,13 +92,16 @@ export default function JobSearchPage() {
 			ref.current.scrollBy({ left: 200, behavior: "smooth" })
 		}
 	}
-
 	const navigateWithFilter = (filter: string, value: string) => {
+		// Optionally keep localStorage for persistence
 		localStorage.setItem(
 			"jobFilter",
 			JSON.stringify({ [filter]: value })
 		)
-		router.push("/findjobs")
+
+		// Pass filter as query parameter
+		const queryParam = encodeURIComponent(value)
+		router.push(`/findjobs?${filter}=${queryParam}`)
 	}
 
 	return (
