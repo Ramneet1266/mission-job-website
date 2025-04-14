@@ -99,7 +99,7 @@ export default function Information() {
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<p>Loading information...</p>
+				
 			</div>
 		)
 	}

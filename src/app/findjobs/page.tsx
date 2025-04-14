@@ -521,7 +521,7 @@ export default function JobFilterBar() {
 				<div className="w-1/2 border-r-2 border-blue-200 overflow-y-auto p-4 space-y-3 bg-white rounded-l-md shadow-md">
 					{loading ? (
 						<p className="text-center text-blue-600 font-medium animate-pulse">
-							Loading jobs...
+							
 						</p>
 					) : error ? (
 						<p className="text-center text-red-600 font-semibold">

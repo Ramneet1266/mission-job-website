@@ -113,7 +113,7 @@ export default function JobSearchPage() {
 						Jobs by Categories
 					</h2>
 					{loading ? (
-						<p className="text-gray-600">Loading categories...</p>
+						<p className="text-gray-600"></p>
 					) : error ? (
 						<p className="text-red-600">{error}</p>
 					) : categories.length === 0 ? (
@@ -142,7 +142,7 @@ export default function JobSearchPage() {
 					</h2>
 					{loading ? (
 						<p className="text-gray-600 text-center">
-							Loading locations...
+							
 						</p>
 					) : error && cities.length === 0 ? (
 						<p className="text-red-600 text-center">
@@ -192,7 +192,7 @@ export default function JobSearchPage() {
 					</h2>
 					{loading ? (
 						<p className="text-gray-600 text-center">
-							Loading schools...
+							
 						</p>
 					) : error && companies.length === 0 ? (
 						<p className="text-red-600 text-center">
