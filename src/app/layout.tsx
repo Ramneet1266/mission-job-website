@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar"
 import Loading from "./components/Loading"
 import WhatsappButton from "./components/WhatsappButton"
 import "./globals.css"
+import { Toaster } from "react-hot-toast"
 
 export default function RootLayout({
 	children,
@@ -36,6 +37,7 @@ export default function RootLayout({
 							className={!hideLayout ? "min-h-screen my-[10px]" : ""}
 						>
 							{children}
+							<Toaster position="top-right" />
 						</div>
 						{!hideLayout && <Footer />}
 						{!hideLayout && <WhatsappButton />}

@@ -1,9 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { collection, getDocs } from "firebase/firestore"
+import { useRouter } from "next/navigation"
+import { db } from "../lib/firebase"
 
 type NewsItem = {
-	id: number
+	id: string
 	title: string
 	description: string
 	image: string
@@ -12,133 +15,56 @@ type NewsItem = {
 	searchCount?: number
 }
 
-const newsData: NewsItem[] = [
-	{
-		id: 1,
-		title: "AI Revolutionizing Healthcare",
-		description:
-			"AI is transforming diagnostics, patient care, and medical research.",
-		image: "https://source.unsplash.com/400x300/?healthcare,ai",
-		link: "#",
-		date: "2025-04-01",
-		searchCount: 50,
-	},
-	{
-		id: 2,
-		title: "SpaceX Launches New Rocket",
-		description:
-			"SpaceX launched its new rocket from Cape Canaveral.",
-		image: "https://source.unsplash.com/400x300/?spacex,rocket",
-		link: "#",
-		date: "2025-03-20",
-		searchCount: 80,
-	},
-	{
-		id: 3,
-		title: "Climate Change and Its Impact",
-		description:
-			"Global warming is changing ecosystems and weather patterns.",
-		image: "https://source.unsplash.com/400x300/?climate,environment",
-		link: "#",
-		date: "2024-12-15",
-		searchCount: 40,
-	},
-	{
-		id: 4,
-		title: "Quantum Physics Breakthrough",
-		description:
-			"Quantum experiments are reshaping our understanding of reality.",
-		image: "https://source.unsplash.com/400x300/?quantum,science",
-		link: "#",
-		date: "2025-02-10",
-		searchCount: 95,
-	},
-	{
-		id: 5,
-		title: "Tech in Education",
-		description: "E-learning is revolutionizing education globally.",
-		image:
-			"https://source.unsplash.com/400x300/?education,technology",
-		link: "#",
-		date: "2024-10-05",
-		searchCount: 60,
-	},
-	{
-		id: 6,
-		title: "Stock Market Volatility",
-		description: "Markets fluctuate as global tensions rise.",
-		image: "https://source.unsplash.com/400x300/?finance,stock",
-		link: "#",
-		date: "2025-01-30",
-		searchCount: 45,
-	},
-	{
-		id: 7,
-		title: "Ocean Cleanup Efforts",
-		description:
-			"Innovative solutions are helping clean up the oceans.",
-		image: "https://source.unsplash.com/400x300/?ocean,cleanup",
-		link: "#",
-		date: "2023-11-01",
-		searchCount: 25,
-	},
-	{
-		id: 8,
-		title: "Electric Cars Expansion",
-		description: "EV companies are growing across continents.",
-		image: "https://source.unsplash.com/400x300/?electric,car",
-		link: "#",
-		date: "2025-03-10",
-		searchCount: 100,
-	},
-	{
-		id: 9,
-		title: "Mars Exploration Mission",
-		description: "Rovers continue their journey across Mars.",
-		image: "https://source.unsplash.com/400x300/?mars,rover",
-		link: "#",
-		date: "2024-09-10",
-		searchCount: 30,
-	},
-	{
-		id: 10,
-		title: "Cybersecurity Trends",
-		description: "Learn the latest threats in the digital world.",
-		image: "https://source.unsplash.com/400x300/?cybersecurity,tech",
-		link: "#",
-		date: "2025-01-01",
-		searchCount: 70,
-	},
-	{
-		id: 11,
-		title: "Smart Cities of the Future",
-		description: "Cities are getting smarter and more connected.",
-		image: "https://source.unsplash.com/400x300/?smartcity,future",
-		link: "#",
-		date: "2023-08-25",
-		searchCount: 35,
-	},
-	{
-		id: 12,
-		title: "Biotech Startups Rise",
-		description: "Biotech firms are gaining traction in medicine.",
-		image: "https://source.unsplash.com/400x300/?biotech,lab",
-		link: "#",
-		date: "2025-04-03",
-		searchCount: 55,
-	},
-]
-
 export default function News() {
 	const [visibleCount, setVisibleCount] = useState(9)
 	const [filter, setFilter] = useState<
 		"latest" | "oldest" | "most" | ""
 	>("")
 	const [search, setSearch] = useState("")
+	const [newsData, setNewsData] = useState<NewsItem[]>([])
+	const [loading, setLoading] = useState(true)
+	const router = useRouter()
 
 	const handleLoadMore = () => {
 		setVisibleCount((prev) => prev + 3)
 	}
+
+	// Fetch data from Firestore
+	useEffect(() => {
+		const fetchNews = async () => {
+			try {
+				const querySnapshot = await getDocs(collection(db, "news"))
+				const news: NewsItem[] = []
+
+				querySnapshot.forEach((doc) => {
+					const data = doc.data()
+					const date = data.createdAt
+						? new Date(data.createdAt).toISOString().split("T")[0]
+						: undefined
+
+					news.push({
+						id: doc.id,
+						title: data.title || "Untitled",
+						description: data.information || "No description",
+						image:
+							data.url || "https://source.unsplash.com/400x300/?news", // Use full URL from Firestore
+						link: "#",
+						date: date,
+						searchCount: data.searchCount || 0,
+					})
+				})
+
+				console.log("Fetched news data with images:", news) // Debug log with images
+				setNewsData(news)
+			} catch (error) {
+				console.error("Error fetching news:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchNews()
+	}, [])
 
 	const filteredNews = useMemo(() => {
 		let filtered = [...newsData]
@@ -156,12 +82,14 @@ export default function News() {
 		if (filter === "latest") {
 			filtered.sort(
 				(a, b) =>
-					new Date(b.date!).getTime() - new Date(a.date!).getTime()
+					new Date(b.date || "").getTime() -
+					new Date(a.date || "").getTime()
 			)
 		} else if (filter === "oldest") {
 			filtered.sort(
 				(a, b) =>
-					new Date(a.date!).getTime() - new Date(b.date!).getTime()
+					new Date(a.date || "").getTime() -
+					new Date(b.date || "").getTime()
 			)
 		} else if (filter === "most") {
 			filtered.sort(
@@ -170,7 +98,28 @@ export default function News() {
 		}
 
 		return filtered
-	}, [filter, search])
+	}, [filter, search, newsData])
+
+	if (loading) {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<p>Loading news...</p>
+			</div>
+		)
+	}
+
+	const handleReadMore = (newsItem: NewsItem) => {
+		if (!newsItem || !newsItem.id) {
+			console.error("Invalid news item:", newsItem)
+			return
+		}
+		const queryString = `?data=${encodeURIComponent(
+			JSON.stringify(newsItem)
+		)}`
+		router.push(
+			`/news/${encodeURIComponent(newsItem.id)}${queryString}`
+		)
+	}
 
 	return (
 		<div className="min-h-screen bg-blue-50 py-12 px-6 mt-16">
@@ -236,18 +185,21 @@ export default function News() {
 							src={news.image}
 							alt={news.title}
 							className="w-full h-48 object-cover"
+							onError={(e) =>
+								console.error("Image load error:", news.image, e)
+							} // Debug image load failure
 						/>
 						<div className="p-5">
 							<h2 className="text-xl font-semibold text-blue-700 mb-2">
 								{news.title}
 							</h2>
 							<p className="text-gray-600 mb-4">{news.description}</p>
-							<a
-								href={news.link}
+							<button
+								onClick={() => handleReadMore(news)}
 								className="inline-block text-white bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 hover:scale-105 transition-all"
 							>
 								Read More
-							</a>
+							</button>
 						</div>
 					</div>
 				))}

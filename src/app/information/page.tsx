@@ -1,90 +1,17 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { collection, getDocs } from "firebase/firestore"
+import { db } from "../lib/firebase"
 
 type CardItem = {
 	id: number
 	image: string
 	title: string
 	description: string
-	date: string // Added for sorting (Latest/Oldest)
-	searchCount: number // For "Most Searched"
+	date: string
+	searchCount: number
 }
-
-const cardData: CardItem[] = [
-	{
-		id: 1,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 1",
-		description: "This is a short description for card 1.",
-		date: "2024-12-01",
-		searchCount: 45,
-	},
-	{
-		id: 2,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 2",
-		description: "This is a short description for card 2.",
-		date: "2025-01-15",
-		searchCount: 90,
-	},
-	{
-		id: 3,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 3",
-		description: "This is a short description for card 3.",
-		date: "2025-03-05",
-		searchCount: 30,
-	},
-	{
-		id: 4,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 4",
-		description: "This is a short description for card 4.",
-		date: "2023-09-20",
-		searchCount: 120,
-	},
-	{
-		id: 5,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 5",
-		description: "This is a short description for card 5.",
-		date: "2025-02-10",
-		searchCount: 75,
-	},
-	{
-		id: 6,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 6",
-		description: "This is a short description for card 6.",
-		date: "2024-06-30",
-		searchCount: 60,
-	},
-	{
-		id: 7,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 7",
-		description: "This is a short description for card 7.",
-		date: "2025-04-01",
-		searchCount: 10,
-	},
-	{
-		id: 8,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 8",
-		description: "This is a short description for card 8.",
-		date: "2023-11-12",
-		searchCount: 95,
-	},
-	{
-		id: 9,
-		image: "https://via.placeholder.com/300x200",
-		title: "Card 9",
-		description: "This is a short description for card 9.",
-		date: "2024-01-25",
-		searchCount: 50,
-	},
-]
 
 export default function Information() {
 	const [currentPage, setCurrentPage] = useState(1)
@@ -92,8 +19,46 @@ export default function Information() {
 		"latest" | "oldest" | "most" | ""
 	>("")
 	const [search, setSearch] = useState("")
+	const [cardData, setCardData] = useState<CardItem[]>([])
+	const [loading, setLoading] = useState(true)
 
 	const cardsPerPage = 3
+
+	// Fetch data from Firestore
+	useEffect(() => {
+		const fetchCards = async () => {
+			try {
+				const querySnapshot = await getDocs(
+					collection(db, "information")
+				)
+				const cards: CardItem[] = []
+
+				querySnapshot.forEach((doc) => {
+					const data = doc.data()
+					const date = new Date(data.createdAt)
+						.toISOString()
+						.split("T")[0] // Convert to YYYY-MM-DD
+
+					cards.push({
+						id: Number(doc.id) || cards.length + 1, // Use document ID or incremental ID
+						image: data.url || "https://via.placeholder.com/300x200", // Use url as image
+						title: data.title || "Untitled",
+						description: data.information || "No description",
+						date: date || "1970-01-01",
+						searchCount: data.searchCount || 0, // Default to 0 if not present
+					})
+				})
+
+				setCardData(cards)
+			} catch (error) {
+				console.error("Error fetching cards:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchCards()
+	}, [])
 
 	const filteredData = useMemo(() => {
 		let filtered = [...cardData]
@@ -123,13 +88,21 @@ export default function Information() {
 		}
 
 		return filtered
-	}, [filter, search])
+	}, [filter, search, cardData])
 
 	const totalPages = Math.ceil(filteredData.length / cardsPerPage)
 	const currentCards = filteredData.slice(
 		(currentPage - 1) * cardsPerPage,
 		currentPage * cardsPerPage
 	)
+
+	if (loading) {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<p>Loading information...</p>
+			</div>
+		)
+	}
 
 	return (
 		<div className="min-h-screen mt-18 bg-blue-50 py-10 px-4">

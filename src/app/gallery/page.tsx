@@ -1,7 +1,9 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { ref, listAll, getDownloadURL } from "firebase/storage"
+import { storage } from "../lib/firebase"
 
 type GalleryItem = {
 	id: number
@@ -10,42 +12,54 @@ type GalleryItem = {
 	alt: string
 }
 
-const galleryItems: GalleryItem[] = [
-	{
-		id: 1,
-		type: "image",
-		src: "https://via.placeholder.com/300x200",
-		alt: "Image 1",
-	},
-	{
-		id: 2,
-		type: "video",
-		src: "https://www.w3schools.com/html/mov_bbb.mp4",
-		alt: "Video 1",
-	},
-	{
-		id: 3,
-		type: "image",
-		src: "https://via.placeholder.com/300x200",
-		alt: "Image 2",
-	},
-	{
-		id: 4,
-		type: "video",
-		src: "https://www.w3schools.com/html/mov_bbb.mp4",
-		alt: "Video 2",
-	},
-	{
-		id: 5,
-		type: "image",
-		src: "https://via.placeholder.com/300x200",
-		alt: "Image 3",
-	},
-]
-
 export default function GalleryPage() {
+	const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([])
 	const [selectedItem, setSelectedItem] =
 		useState<GalleryItem | null>(null)
+	const [loading, setLoading] = useState(true)
+
+	// Fetch images and videos from Firebase Storage
+	useEffect(() => {
+		const fetchMedia = async () => {
+			try {
+				const items: GalleryItem[] = []
+
+				// Fetch images from galleryImages folder
+				const imagesRef = ref(storage, "galleryImages")
+				const imageList = await listAll(imagesRef)
+				for (const itemRef of imageList.items) {
+					const url = await getDownloadURL(itemRef)
+					items.push({
+						id: items.length + 1,
+						type: "image",
+						src: url,
+						alt: itemRef.name,
+					})
+				}
+
+				// Fetch videos from videos folder
+				const videosRef = ref(storage, "videos")
+				const videoList = await listAll(videosRef)
+				for (const itemRef of videoList.items) {
+					const url = await getDownloadURL(itemRef)
+					items.push({
+						id: items.length + 1,
+						type: "video",
+						src: url,
+						alt: itemRef.name,
+					})
+				}
+
+				setGalleryItems(items)
+			} catch (error) {
+				console.error("Error fetching media:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchMedia()
+	}, [])
 
 	const modalVariants = {
 		hidden: { opacity: 0, scale: 0.8 },
@@ -55,6 +69,14 @@ export default function GalleryPage() {
 
 	const images = galleryItems.filter((item) => item.type === "image")
 	const videos = galleryItems.filter((item) => item.type === "video")
+
+	if (loading) {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<p>Loading media...</p>
+			</div>
+		)
+	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b mt-18 from-blue-50 to-white pt-10">
@@ -135,7 +157,7 @@ export default function GalleryPage() {
 									className="absolute top-4 right-4 text-blue-700 text-2xl font-bold hover:text-blue-900"
 									onClick={() => setSelectedItem(null)}
 								>
-									&times;
+									×
 								</button>
 								{selectedItem.type === "image" ? (
 									<img

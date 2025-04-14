@@ -1,17 +1,47 @@
 "use client"
+
 import { useState } from "react"
+import { motion } from "framer-motion"
 import { User, Mail, Lock, Phone, UserPlus } from "lucide-react"
 import Link from "next/link"
-import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
+import toast from "react-hot-toast"
+import {
+	createUserWithEmailAndPassword,
+	UserCredential,
+} from "firebase/auth"
+import { auth } from "../lib/firebase"
+
 export default function Signup() {
 	const [name, setName] = useState("")
 	const [email, setEmail] = useState("")
 	const [password, setPassword] = useState("")
 	const [phone, setPhone] = useState("")
+	const [error, setError] = useState<string | null>(null)
+	const [loading, setLoading] = useState(false)
+	const router = useRouter()
 
-	const handleSignup = (e: React.FormEvent) => {
+	const handleSignup = async (e: React.FormEvent) => {
 		e.preventDefault()
-		console.log("Signing up with:", { name, email, password, phone })
+		setLoading(true)
+		setError(null)
+
+		try {
+			const userCredential: UserCredential =
+				await createUserWithEmailAndPassword(auth, email, password)
+			console.log("User registered with:", userCredential.user.uid)
+			toast.success("Registration successful! Redirecting...", {
+				duration: 2000,
+			})
+			setTimeout(() => {
+				router.push("/") // Redirect to homepage
+			}, 2000)
+		} catch (err: any) {
+			setError(err.message || "An error occurred during registration")
+			console.error("Registration error:", err)
+		} finally {
+			setLoading(false)
+		}
 	}
 
 	return (
@@ -22,13 +52,16 @@ export default function Signup() {
 				transition={{ duration: 0.6 }}
 				className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 md:p-10"
 			>
-				{/* <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 md:p-10"> */}
 				<h2 className="text-3xl font-bold text-blue-700 mb-1 flex items-center gap-2">
 					<UserPlus className="w-6 h-6" /> Create Account
 				</h2>
 				<p className="text-sm text-gray-500 mb-6">
 					Sign up to get started
 				</p>
+
+				{error && (
+					<div className="text-red-600 text-sm mb-4">{error}</div>
+				)}
 
 				<form onSubmit={handleSignup} className="space-y-5">
 					<div>
@@ -42,6 +75,7 @@ export default function Signup() {
 							onChange={(e) => setName(e.target.value)}
 							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="John Doe"
+							disabled={loading}
 						/>
 					</div>
 
@@ -56,6 +90,7 @@ export default function Signup() {
 							onChange={(e) => setEmail(e.target.value)}
 							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="example@domain.com"
+							disabled={loading}
 						/>
 					</div>
 
@@ -70,6 +105,7 @@ export default function Signup() {
 							onChange={(e) => setPhone(e.target.value)}
 							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="1234567890"
+							disabled={loading}
 						/>
 					</div>
 
@@ -84,14 +120,16 @@ export default function Signup() {
 							onChange={(e) => setPassword(e.target.value)}
 							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="••••••••"
+							disabled={loading}
 						/>
 					</div>
 
 					<button
 						type="submit"
-						className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all"
+						className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all disabled:bg-blue-400"
+						disabled={loading}
 					>
-						Sign Up
+						{loading ? "Signing up..." : "Sign Up"}
 					</button>
 				</form>
 
@@ -99,12 +137,14 @@ export default function Signup() {
 					Already have an account?{" "}
 					<Link
 						href="/login"
-						className="text-blue-600 hover:underline"
+						className={`text-blue-600 hover:underline ${
+							loading ? "pointer-events-none text-gray-400" : ""
+						}`}
+						onClick={loading ? (e) => e.preventDefault() : undefined}
 					>
 						Log in
 					</Link>
 				</p>
-				{/* </div> */}
 			</motion.div>
 		</div>
 	)
