@@ -1,101 +1,150 @@
 "use client"
 
-import { Calendar } from "lucide-react"
-import Image from "next/image"
-import { motion } from "framer-motion"
+import { useState, useEffect, useMemo } from "react"
+import { collection, getDocs } from "firebase/firestore"
+import { useRouter } from "next/navigation"
+import { db } from "@/app/lib/firebase"
 
-const blogs = [
-	{
-		date: "August 24, 2024",
-		title:
-			"Attracting and Retaining Top Talent: Strategies for Educational...",
-		desc: "In today’s competitive landscape, attracting and retaining top talent is crucial for educational institutions aim...",
+type NewsItem = {
+	id: string
+	title: string
+	description: string
+	image: string
+	link: string
+	date?: string
+	searchCount?: number
+}
 
-		image: "/blogs/blog1.png",
-	},
-	{
-		date: "July 24, 2024",
-		title: "Identifying Your Strengths for Educational Job Vacancies",
-		desc: "In the competitive landscape of educational job vacancies in India, knowing your strengths is not just beneficial b...",
+export default function News() {
+	const [visibleCount, setVisibleCount] = useState(9)
+	const [filter, setFilter] = useState<
+		"latest" | "oldest" | "most" | ""
+	>("")
+	const [search, setSearch] = useState("")
+	const [newsData, setNewsData] = useState<NewsItem[]>([])
+	const [loading, setLoading] = useState(true)
+	const router = useRouter()
 
-		image: "/blogs/blog2.png",
-	},
-	{
-		date: "July 15, 2024",
-		title:
-			"Building Your Teacher Profile: A Guide to Building a Standout...",
-		desc: "Building Your Teacher Profile: A Guide to Building a Standout Professional Identity...",
+	const handleLoadMore = () => {
+		setVisibleCount((prev) => prev + 3)
+	}
 
-		image: "/blogs/blog3.png",
-	},
-]
+	// Fetch data from Firestore
+	useEffect(() => {
+		const fetchNews = async () => {
+			try {
+				const querySnapshot = await getDocs(collection(db, "news"))
+				const news: NewsItem[] = []
 
-export default function Blogs() {
+				querySnapshot.forEach((doc) => {
+					const data = doc.data()
+					const date = data.createdAt
+						? new Date(data.createdAt).toISOString().split("T")[0]
+						: undefined
+
+					news.push({
+						id: doc.id,
+						title: data.title || "Untitled",
+						description: data.information || "No description",
+						image:
+							data.url || "https://source.unsplash.com/400x300/?news", // Use full URL from Firestore
+						link: "#",
+						date: date,
+						searchCount: data.searchCount || 0,
+					})
+				})
+
+				console.log("Fetched news data with images:", news) // Debug log with images
+				setNewsData(news)
+			} catch (error) {
+				console.error("Error fetching news:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchNews()
+	}, [])
+
+	const filteredNews = useMemo(() => {
+		let filtered = [...newsData]
+
+		if (search) {
+			filtered = filtered.filter(
+				(item) =>
+					item.title.toLowerCase().includes(search.toLowerCase()) ||
+					item.description
+						.toLowerCase()
+						.includes(search.toLowerCase())
+			)
+		}
+
+		if (filter === "latest") {
+			filtered.sort(
+				(a, b) =>
+					new Date(b.date || "").getTime() -
+					new Date(a.date || "").getTime()
+			)
+		} else if (filter === "oldest") {
+			filtered.sort(
+				(a, b) =>
+					new Date(a.date || "").getTime() -
+					new Date(b.date || "").getTime()
+			)
+		} else if (filter === "most") {
+			filtered.sort(
+				(a, b) => (b.searchCount ?? 0) - (a.searchCount ?? 0)
+			)
+		}
+
+		return filtered
+	}, [filter, search, newsData])
+
 	return (
-		<motion.section
-			initial={{ opacity: 0, y: 60 }}
-			whileInView={{ opacity: 1, y: 0 }}
-			transition={{ duration: 0.6, ease: "easeOut" }}
-			viewport={{ once: true, amount: 0.5 }} // Trigger when center reaches viewport
-			className="bg-white py-12 px-6"
-		>
-			<section className="bg-slate-50 py-16 px-6">
-				<div className="max-w-7xl mx-auto">
-					<h2 className="text-3xl font-bold text-center text-blue-900 mb-12">
-						News
-					</h2>
+		<div className=" py-12 px-6 mt-16">
+			<h1 className="text-4xl font-bold text-center text-blue-900 mb-10">
+				News
+			</h1>
 
-					<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-						{blogs.map((blog, idx) => (
-							<div
-								key={idx}
-								className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-all"
-							>
-								<div className="w-full h-48 relative rounded-md overflow-hidden mb-3">
-									<Image
-										src={blog.image}
-										alt={blog.title}
-										fill
-										className="object-cover"
-									/>
-								</div>
-
-								<div className="flex items-center text-gray-600 text-sm mb-2">
-									<Calendar className="w-4 h-4 mr-2" />
-									{blog.date}
-								</div>
-
-								<h3 className="font-semibold text-lg text-blue-900 mb-2">
-									{blog.title}
-								</h3>
-
-								<p className="text-sm text-gray-700 mb-4">
-									{blog.desc}
-								</p>
-
-								<div className="flex gap-3">
-									{[
-										"facebook",
-										"twitter",
-										"linkedin",
-										"whatsapp",
-									].map((platform) => (
-										<a key={platform} href="#">
-											<Image
-												src={`/icons/${platform}.svg`}
-												alt={platform}
-												width={20}
-												height={20}
-												className="hover:scale-110 transition"
-											/>
-										</a>
-									))}
-								</div>
-							</div>
-						))}
+			{/* News Cards */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+				{filteredNews.slice(0, visibleCount).map((news) => (
+					<div
+						key={news.id}
+						className="bg-white shadow-lg rounded-xl overflow-hidden transform transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
+					>
+						<img
+							src={news.image}
+							alt={news.title}
+							className="w-full h-48 object-cover"
+							onError={(e) =>
+								console.error("Image load error:", news.image, e)
+							} // Debug image load failure
+						/>
+						<div className="p-5">
+							<h2 className="text-xl font-semibold text-blue-700 mb-2">
+								{news.title}
+							</h2>
+							<p className="text-gray-600 mb-4">{news.description}</p>
+							<button className="inline-block text-white bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 hover:scale-105 transition-all">
+								Read More
+							</button>
+						</div>
 					</div>
+				))}
+			</div>
+
+			{/* Load More */}
+			{visibleCount < filteredNews.length && (
+				<div className="flex justify-center mt-10">
+					<button
+						onClick={handleLoadMore}
+						className="bg-blue-700 text-white px-6 py-3 rounded-full hover:bg-blue-800 transition-all shadow-md hover:scale-105"
+					>
+						Show More
+					</button>
 				</div>
-			</section>
-		</motion.section>
+			)}
+		</div>
 	)
 }
