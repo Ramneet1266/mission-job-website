@@ -30,7 +30,7 @@ export default function Navbar() {
 					href="/"
 					className="text-3xl font-bold text-blue-700 cursor-pointer"
 				>
-					found<span className="text-blue-400">●</span>it
+					Mission<span className="text-blue-400">●</span>Job
 				</Link>
 			</div>
 
