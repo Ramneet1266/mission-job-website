@@ -11,7 +11,7 @@ export default function Loading() {
 					</div>
 				</div>
 				<p className="text-xl font-semibold text-blue-200 animate-pulse tracking-wide">
-					Loading your experience...
+					
 				</p>
 			</div>
 		</div>

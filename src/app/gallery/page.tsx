@@ -73,7 +73,7 @@ export default function GalleryPage() {
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<p>Loading media...</p>
+				
 			</div>
 		)
 	}
