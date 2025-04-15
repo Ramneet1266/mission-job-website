@@ -101,7 +101,7 @@ export default function News() {
 	}, [filter, search, newsData])
 
 	return (
-		<div className=" py-12 px-6 mt-16">
+		<div className=" pb-5 px-6 mt-2">
 			<h1 className="text-4xl font-bold text-center text-blue-900 mb-10">
 				News
 			</h1>
