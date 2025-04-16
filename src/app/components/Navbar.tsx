@@ -8,51 +8,51 @@ import {
 	onAuthStateChanged,
 	User,
 	signOut,
+	db,
 } from "../lib/firebase"
 import { useRouter } from "next/navigation"
-import { db } from "../lib/firebase"
-import { doc, getDoc } from "firebase/firestore"
+import {
+	doc,
+	getDoc,
+	updateDoc,
+} from "firebase/firestore"
+import {
+	getStorage,
+	ref,
+	uploadBytes,
+	getDownloadURL,
+} from "firebase/storage"
 
 export default function Navbar() {
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 	const [user, setUser] = useState<User | null>(null)
 	const [userName, setUserName] = useState<string | null>(null)
 	const dropdownRef = useRef<HTMLDivElement | null>(null)
+	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const router = useRouter()
 
 	// Check auth state and fetch user name from Firestore
 	useEffect(() => {
-		const unsubscribe = onAuthStateChanged(
-			auth,
-			async (currentUser: User | null) => {
-				console.log(
-					"NavBar auth state:",
-					currentUser ? "Signed in" : "Not signed in"
-				)
-				setUser(currentUser)
-				if (currentUser) {
-					// Fetch user name from Firestore
-					try {
-						const userDoc = await getDoc(
-							doc(db, "users", currentUser.uid)
-						)
-						if (userDoc.exists()) {
-							const userData = userDoc.data()
-							setUserName(
-								userData.name || currentUser.email || "User"
-							)
-						} else {
-							setUserName(currentUser.email || "User")
-						}
-					} catch (error) {
-						console.error("Error fetching user name:", error)
+		const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+			console.log("NavBar auth state:", currentUser ? "Signed in" : "Not signed in")
+			setUser(currentUser)
+			if (currentUser) {
+				try {
+					const userDoc = await getDoc(doc(db, "users", currentUser.uid))
+					if (userDoc.exists()) {
+						const userData = userDoc.data()
+						setUserName(userData.name || currentUser.email || "User")
+					} else {
 						setUserName(currentUser.email || "User")
 					}
-				} else {
-					setUserName(null)
+				} catch (error) {
+					console.error("Error fetching user name:", error)
+					setUserName(currentUser.email || "User")
 				}
+			} else {
+				setUserName(null)
 			}
-		)
+		})
 		return () => unsubscribe()
 	}, [])
 
@@ -76,10 +76,38 @@ export default function Navbar() {
 		try {
 			await signOut(auth)
 			console.log("Logged out successfully")
-			router.push("/") // Redirect to home
+			router.push("/")
 		} catch (error) {
 			console.error("Logout error:", error)
 		}
+	}
+
+	// Handle file upload
+	const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0]
+		if (!file || !user) return
+
+		const storage = getStorage()
+		const storageRef = ref(storage, `user-files/${user.uid}/${file.name}`)
+
+		try {
+			await uploadBytes(storageRef, file)
+			const downloadURL = await getDownloadURL(storageRef)
+
+			const userDocRef = doc(db, "users", user.uid)
+			await updateDoc(userDocRef, {
+				fileUrl: downloadURL,
+			})
+
+			alert("Resume uploaded successfully!")
+		} catch (error) {
+			console.error("Error uploading file:", error)
+			alert("Failed to upload resume. Please try again.")
+		}
+	}
+
+	const handleUploadClick = () => {
+		fileInputRef.current?.click()
 	}
 
 	return (
@@ -139,12 +167,32 @@ export default function Navbar() {
 			<div className="flex items-center space-x-4 font-medium">
 				{user ? (
 					<div className="flex items-center space-x-4">
+						{/* Upload Resume */}
+						<>
+							<input
+								type="file"
+								accept=".pdf,.doc,.docx"
+								ref={fileInputRef}
+								style={{ display: "none" }}
+								onChange={handleFileChange}
+							/>
+							<button
+								onClick={handleUploadClick}
+								className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+							>
+								📄 Upload Resume
+							</button>
+						</>
+
+						{/* Logout */}
 						<button
 							onClick={handleLogout}
 							className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
 						>
 							<span className="mr-1">🚪</span>Logout
 						</button>
+
+						{/* Username */}
 						<span className="text-black flex items-center gap-1">
 							<UserIcon size={16} />
 							{userName}
