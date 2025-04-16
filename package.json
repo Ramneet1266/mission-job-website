@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.1",
     "@types/swiper": "^5.4.3",
     "axios": "^1.8.4",
     "firebase": "^11.6.0",

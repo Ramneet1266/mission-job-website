@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase"
+import { Dialog, Transition } from "@headlessui/react"
+import { Fragment } from "react"
 
 type CardItem = {
 	id: number
@@ -21,6 +23,9 @@ export default function Information() {
 	const [search, setSearch] = useState("")
 	const [cardData, setCardData] = useState<CardItem[]>([])
 	const [loading, setLoading] = useState(true)
+	const [selectedCard, setSelectedCard] = useState<CardItem | null>(
+		null
+	)
 
 	const cardsPerPage = 3
 
@@ -99,15 +104,15 @@ export default function Information() {
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				
+				<div className="text-blue-700 text-lg">Loading...</div>
 			</div>
 		)
 	}
 
 	return (
-		<div className="min-h-screen mt-18 bg-blue-50 py-10 px-4">
-			<div className="max-w-6xl mx-auto">
-				<h1 className="text-3xl font-bold text-blue-800 mb-6 text-center">
+		<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
+			<div className="max-w-7xl mx-auto">
+				<h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
 					Information
 				</h1>
 
@@ -159,33 +164,77 @@ export default function Information() {
 				</div>
 
 				{/* Card Grid */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 					{currentCards.map((card) => (
 						<div
 							key={card.id}
-							className="bg-white rounded-xl shadow-md hover:shadow-lg transition p-4 flex flex-col"
+							className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
 						>
-							<img
-								src={card.image}
-								alt={card.title}
-								className="rounded-md w-full h-40 object-cover mb-4"
-							/>
-							<h2 className="text-lg font-semibold text-blue-900 mb-2">
-								{card.title}
-							</h2>
-							<p className="text-sm text-gray-700 flex-1">
-								{card.description}
-							</p>
-							<button className="mt-4 text-sm font-medium text-blue-700 hover:underline self-start">
-								Read More →
-							</button>
+							<div className="relative w-full h-56">
+								<img
+									src={card.image}
+									alt={card.title}
+									className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+									onError={(e) =>
+										console.error("Image load error:", card.image, e)
+									}
+								/>
+								<button
+									onClick={() => setSelectedCard(card)}
+									className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+								>
+									Read More
+								</button>
+							</div>
+							<div className="p-5">
+								<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
+									{card.title}
+								</h2>
+								<p className="text-gray-600 text-sm mb-4 line-clamp-3">
+									{card.description}
+								</p>
+								<div className="flex justify-between items-center text-gray-500 text-xs">
+									<span className="flex items-center gap-1.5">
+										<svg
+											className="w-4 h-4"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="2"
+												d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+											/>
+										</svg>
+										{card.date || "Unknown"}
+									</span>
+									<span className="flex items-center gap-1.5">
+										<svg
+											className="w-4 h-4"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="2"
+												d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+											/>
+										</svg>
+										{card.searchCount ?? 0}
+									</span>
+								</div>
+							</div>
 						</div>
 					))}
 				</div>
 
 				{/* Pagination */}
 				{totalPages > 1 && (
-					<div className="flex justify-center mt-10">
+					<div className="flex justify-center mt-8">
 						<nav
 							className="inline-flex gap-2"
 							aria-label="Pagination"
@@ -211,6 +260,67 @@ export default function Information() {
 						</nav>
 					</div>
 				)}
+
+				{/* Modal for Read More */}
+				<Transition appear show={selectedCard !== null} as={Fragment}>
+					<Dialog
+						as="div"
+						className="relative z-50"
+						onClose={() => setSelectedCard(null)}
+					>
+						<Transition.Child
+							as={Fragment}
+							enter="ease-out duration-300"
+							enterFrom="opacity-0"
+							enterTo="opacity-100"
+							leave="ease-in duration-200"
+							leaveFrom="opacity-100"
+							leaveTo="opacity-0"
+						>
+							<div className="fixed inset-0 bg-black/40" />
+						</Transition.Child>
+
+						<div className="fixed inset-0 overflow-y-auto">
+							<div className="flex min-h-full items-center justify-center p-4">
+								<Transition.Child
+									as={Fragment}
+									enter="ease-out duration-300"
+									enterFrom="opacity-0 scale-95"
+									enterTo="opacity-100 scale-100"
+									leave="ease-in duration-200"
+									leaveFrom="opacity-100 scale-100"
+									leaveTo="opacity-0 scale-95"
+								>
+									<Dialog.Panel className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+										<Dialog.Title
+											as="h3"
+											className="text-xl font-bold text-gray-900 mb-4"
+										>
+											{selectedCard?.title}
+										</Dialog.Title>
+										<div className="relative w-full h-64">
+											<img
+												src={selectedCard?.image}
+												alt="modal-img"
+												className="absolute inset-0 w-full h-full object-cover rounded-lg"
+											/>
+										</div>
+										<p className="text-gray-600 text-sm my-6">
+											{selectedCard?.description}
+										</p>
+										<button
+											type="button"
+											className="w-full rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition-all duration-200"
+											onClick={() => setSelectedCard(null)}
+										>
+											Close
+										</button>
+									</Dialog.Panel>
+								</Transition.Child>
+							</div>
+						</div>
+					</Dialog>
+				</Transition>
 			</div>
 		</div>
 	)
