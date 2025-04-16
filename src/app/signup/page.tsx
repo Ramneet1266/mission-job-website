@@ -2,7 +2,14 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { User, Mail, Lock, Phone, UserPlus } from "lucide-react"
+import {
+	User,
+	Mail,
+	Lock,
+	Phone,
+	UserPlus,
+	FileText,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
@@ -10,16 +17,28 @@ import {
 	createUserWithEmailAndPassword,
 	UserCredential,
 } from "firebase/auth"
-import { auth } from "../lib/firebase"
+import { auth, db, storage } from "../lib/firebase"
+import { doc, setDoc } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export default function Signup() {
 	const [name, setName] = useState("")
 	const [email, setEmail] = useState("")
 	const [password, setPassword] = useState("")
 	const [phone, setPhone] = useState("")
+	const [file, setFile] = useState<File | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [loading, setLoading] = useState(false)
 	const router = useRouter()
+
+	const handleFileChange = (
+		e: React.ChangeEvent<HTMLInputElement>
+	) => {
+		const selectedFile = e.target.files?.[0]
+		if (selectedFile) {
+			setFile(selectedFile)
+		}
+	}
 
 	const handleSignup = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -29,7 +48,28 @@ export default function Signup() {
 		try {
 			const userCredential: UserCredential =
 				await createUserWithEmailAndPassword(auth, email, password)
-			console.log("User registered with:", userCredential.user.uid)
+			const user = userCredential.user
+
+			let fileUrl = ""
+			if (file) {
+				const storageRef = ref(
+					storage,
+					`user-files/${user.uid}/${file.name}`
+				)
+				await uploadBytes(storageRef, file)
+				fileUrl = await getDownloadURL(storageRef)
+			}
+
+			// Store user details and file URL in Firestore
+			await setDoc(doc(db, "users", user.uid), {
+				name,
+				email,
+				phone,
+				fileUrl: fileUrl || null,
+				createdAt: new Date().toISOString(),
+			})
+
+			console.log("User registered with:", user.uid)
 			toast.success("Registration successful! Redirecting...", {
 				duration: 2000,
 			})
@@ -120,6 +160,18 @@ export default function Signup() {
 							onChange={(e) => setPassword(e.target.value)}
 							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="••••••••"
+							disabled={loading}
+						/>
+					</div>
+
+					<div>
+						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+							<FileText className="w-4 h-4" /> Upload File
+						</label>
+						<input
+							type="file"
+							onChange={handleFileChange}
+							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							disabled={loading}
 						/>
 					</div>
