@@ -18,6 +18,7 @@ type CardItem = {
 
 export default function Information() {
 	const [currentPage, setCurrentPage] = useState(1)
+	const [modalPage, setModalPage] = useState(1) // New state for modal pagination
 	const [filter, setFilter] = useState<
 		"latest" | "oldest" | "most" | ""
 	>("")
@@ -114,6 +115,12 @@ export default function Information() {
 		hidden: { opacity: 0, y: 20 },
 		visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 	}
+
+	const totalModalPages = Math.ceil(cardData.length / cardsPerPage)
+	const modalCards = cardData.slice(
+		(modalPage - 1) * cardsPerPage,
+		modalPage * cardsPerPage
+	)
 
 	return (
 		<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
@@ -245,7 +252,7 @@ export default function Information() {
 					</AnimatePresence>
 				</motion.div>
 
-				{/* Pagination */}
+				{/* Pagination for Cards */}
 				{totalPages > 1 && (
 					<div className="flex justify-center mt-8">
 						<nav
@@ -321,6 +328,32 @@ export default function Information() {
 										<p className="text-gray-600 text-sm my-6">
 											{selectedCard?.description}
 										</p>
+
+										{/* Pagination for Modal */}
+										<div className="flex justify-center mt-4 gap-2">
+											{Array.from(
+												{ length: totalModalPages },
+												(_, i) => {
+													const pageNum = i + 1
+													const isActive = pageNum === modalPage
+
+													return (
+														<button
+															key={pageNum}
+															onClick={() => setModalPage(pageNum)}
+															className={`px-4 py-2 text-sm rounded-full border transition ${
+																isActive
+																	? "bg-blue-700 text-white shadow-md font-semibold"
+																	: "bg-white text-blue-700 border-blue-300 hover:bg-blue-100"
+															}`}
+														>
+															{pageNum}
+														</button>
+													)
+												}
+											)}
+										</div>
+
 										<button
 											type="button"
 											className="w-full rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition-all duration-200"
