@@ -1,7 +1,8 @@
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { db, collection, getDocs } from "../../lib/firebase"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 interface Category {
     id: string
@@ -101,28 +102,58 @@ export default function JobSearchPage() {
         loadingText: string
         emptyText: string
         buttonLabel?: (val: string) => string
-    }) => (
-        <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-blue-900 text-center">{title}</h2>
-            {loading ? (
-                <p className="text-gray-500 italic text-center">{loadingText}</p>
-            ) : error && items.length === 0 ? (
-                <p className="text-red-500 text-center">{emptyText}</p>
-            ) : (
-                <div className="flex overflow-x-auto space-x-2 scrollbar-hide">
-                    {items.map((item, idx) => (
+    }) => {
+        const scrollRef = useRef<HTMLDivElement>(null)
+
+        const scroll = (direction: "left" | "right") => {
+            if (!scrollRef.current) return
+            const scrollAmount = 250
+            scrollRef.current.scrollBy({
+                left: direction === "left" ? -scrollAmount : scrollAmount,
+                behavior: "smooth",
+            })
+        }
+
+        return (
+            <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-blue-900 text-center">{title}</h2>
+                {loading ? (
+                    <p className="text-gray-500 italic text-center">{loadingText}</p>
+                ) : error && items.length === 0 ? (
+                    <p className="text-red-500 text-center">{emptyText}</p>
+                ) : (
+                    <div className="relative">
                         <button
-                            key={idx}
-                            className="flex-shrink-0 bg-white border border-blue-200 hover:border-blue-400 hover:bg-blue-50 text-blue-800 font-medium rounded-lg px-3 py-1 text-sm shadow-sm transition-all duration-200"
-                            onClick={() => navigateWithFilter(filter, item)}
+                            onClick={() => scroll("left")}
+                            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white text-blue-600 shadow-md rounded-full p-1 z-10 hover:bg-blue-100"
                         >
-                            {buttonLabel ? buttonLabel(item) : item}
+                            <ChevronLeft size={20} />
                         </button>
-                    ))}
-                </div>
-            )}
-        </section>
-    )
+                        <div
+                            ref={scrollRef}
+                            className="flex overflow-x-auto space-x-2 scrollbar-hide px-8"
+                        >
+                            {items.map((item, idx) => (
+                                <button
+                                    key={idx}
+                                    className="flex-shrink-0 bg-white border border-blue-200 hover:border-blue-400 hover:bg-blue-50 text-blue-800 font-medium rounded-lg px-3 py-1 text-sm shadow-sm transition-all duration-200"
+                                    onClick={() => navigateWithFilter(filter, item)}
+                                >
+                                    {buttonLabel ? buttonLabel(item) : item}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => scroll("right")}
+                            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white text-blue-600 shadow-md rounded-full p-1 z-10 hover:bg-blue-100"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                )}
+            </section>
+        )
+    }
 
     return (
         <div className="bg-gradient-to-b from-white via-blue-50 to-white pt-8 px-6">
