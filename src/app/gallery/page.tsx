@@ -73,7 +73,7 @@ export default function GalleryPage() {
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				
+				<div className="text-blue-700 text-lg">Loading...</div>
 			</div>
 		)
 	}
@@ -94,18 +94,28 @@ export default function GalleryPage() {
 						{images.map((item) => (
 							<div
 								key={item.id}
-								className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-								onClick={() => setSelectedItem(item)}
+								className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
 							>
-								<img
-									src={item.src}
-									alt={item.alt}
-									className="w-full h-48 object-cover"
-								/>
-								<div className="p-4">
-									<p className="text-blue-700 font-medium">
+								<div className="relative w-full h-56">
+									<img
+										src={item.src}
+										alt={item.alt}
+										className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+										onError={(e) =>
+											console.error("Image load error:", item.src, e)
+										}
+									/>
+									<button
+										onClick={() => setSelectedItem(item)}
+										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+									>
+										View
+									</button>
+								</div>
+								<div className="p-5">
+									<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
 										{item.alt}
-									</p>
+									</h2>
 								</div>
 							</div>
 						))}
@@ -121,17 +131,24 @@ export default function GalleryPage() {
 						{videos.map((item) => (
 							<div
 								key={item.id}
-								className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-								onClick={() => setSelectedItem(item)}
+								className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
 							>
-								<video className="w-full h-48 object-cover" controls>
-									<source src={item.src} type="video/mp4" />
-									Your browser does not support the video tag.
-								</video>
-								<div className="p-4">
-									<p className="text-blue-700 font-medium">
+								<div className="relative w-full h-56">
+									<video className="absolute inset-0 w-full h-full object-scale-down transition-transform duration-300 group-hover:scale-105">
+										<source src={item.src} type="video/mp4" />
+										Your browser does not support the video tag.
+									</video>
+									<button
+										onClick={() => setSelectedItem(item)}
+										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+									>
+										View
+									</button>
+								</div>
+								<div className="p-5">
+									<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
 										{item.alt}
-									</p>
+									</h2>
 								</div>
 							</div>
 						))}
