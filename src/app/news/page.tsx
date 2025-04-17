@@ -5,6 +5,7 @@ import { collection, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { Dialog, Transition } from "@headlessui/react"
 import { Fragment } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 
 type NewsItem = {
 	id: string
@@ -17,7 +18,7 @@ type NewsItem = {
 }
 
 export default function News() {
-	const [visibleCount, setVisibleCount] = useState(9)
+	const [visibleCount, setVisibleCount] = useState(3)
 	const [filter, setFilter] = useState<
 		"latest" | "oldest" | "most" | ""
 	>("")
@@ -32,7 +33,6 @@ export default function News() {
 		setVisibleCount((prev) => prev + 3)
 	}
 
-	// Fetch data from Firestore
 	useEffect(() => {
 		const fetchNews = async () => {
 			try {
@@ -52,12 +52,11 @@ export default function News() {
 						image:
 							data.url || "https://source.unsplash.com/400x300/?news",
 						link: "#",
-						date: date,
+						date,
 						searchCount: data.searchCount || 0,
 					})
 				})
 
-				console.log("Fetched news data with images:", news) // Debug log with images
 				setNewsData(news)
 			} catch (error) {
 				console.error("Error fetching news:", error)
@@ -103,6 +102,17 @@ export default function News() {
 		return filtered
 	}, [filter, search, newsData])
 
+	useEffect(() => {
+		if (filteredNews.length < 3) {
+			setVisibleCount(filteredNews.length)
+		}
+	}, [filteredNews])
+
+	const itemVariants = {
+		hidden: { opacity: 0, y: 20 },
+		visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+	}
+
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
@@ -121,36 +131,24 @@ export default function News() {
 				{/* Filter & Search */}
 				<div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
 					<div className="space-x-2">
-						<button
-							onClick={() => setFilter("latest")}
-							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
-								filter === "latest"
-									? "bg-blue-700 text-white"
-									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
-							}`}
-						>
-							Latest
-						</button>
-						<button
-							onClick={() => setFilter("oldest")}
-							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
-								filter === "oldest"
-									? "bg-blue-700 text-white"
-									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
-							}`}
-						>
-							Oldest
-						</button>
-						<button
-							onClick={() => setFilter("most")}
-							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
-								filter === "most"
-									? "bg-blue-700 text-white"
-									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
-							}`}
-						>
-							Most Searched
-						</button>
+						{["latest", "oldest", "most"].map((f) => (
+							<button
+								key={f}
+								onClick={() => {
+									setFilter(f as typeof filter)
+									setVisibleCount(3)
+								}}
+								className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+									filter === f
+										? "bg-blue-700 text-white"
+										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+								}`}
+							>
+								{f === "most"
+									? "Most Searched"
+									: f[0].toUpperCase() + f.slice(1)}
+							</button>
+						))}
 					</div>
 
 					<input
@@ -159,80 +157,78 @@ export default function News() {
 						value={search}
 						onChange={(e) => {
 							setSearch(e.target.value)
-							setVisibleCount(9)
+							setVisibleCount(3)
 						}}
 						className="w-full md:w-1/3 px-4 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
 					/>
 				</div>
 
 				{/* News Cards */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-					{filteredNews.slice(0, visibleCount).map((news) => (
-						<div
-							key={news.id}
-							className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
-						>
-							<div className="relative w-full h-56">
-								<img
-									src={news.image}
-									alt={news.title}
-									className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-									onError={(e) =>
-										console.error("Image load error:", news.image, e)
-									}
-								/>
-								<button
-									onClick={() => setSelectedNews(news)}
-									className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
-								>
-									Read More
-								</button>
-							</div>
-							<div className="p-5">
-								<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
-									{news.title}
-								</h2>
-								<p className="text-gray-600 text-sm mb-4 line-clamp-3">
-									{news.description}
-								</p>
-								<div className="flex justify-between items-center text-gray-500 text-xs">
-									<span className="flex items-center gap-1.5">
-										<svg
-											className="w-4 h-4"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-											/>
-										</svg>
-										{news.date || "Unknown"}
-									</span>
-									<span className="flex items-center gap-1.5">
-										<svg
-											className="w-4 h-4"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-											/>
-										</svg>
-										{news.searchCount ?? 0}
-									</span>
+				<motion.div
+					className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+					initial="hidden"
+					animate="visible"
+				>
+					<AnimatePresence>
+						{filteredNews.slice(0, visibleCount).map((news) => (
+							<motion.div
+								key={news.id}
+								variants={itemVariants}
+								initial="hidden"
+								animate="visible"
+								exit="hidden"
+								className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
+							>
+								<div className="relative w-full h-56">
+									<img
+										src={news.image}
+										alt={news.title}
+										className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+										onError={(e) => {
+											console.error(
+												"Image load error:",
+												news.image,
+												e
+											)
+										}}
+									/>
+									<button
+										onClick={() => setSelectedNews(news)}
+										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+									>
+										Read More
+									</button>
 								</div>
-							</div>
-						</div>
-					))}
-				</div>
+								<div className="p-5">
+									<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
+										{news.title}
+									</h2>
+									<p className="text-gray-600 text-sm mb-4 line-clamp-3">
+										{news.description}
+									</p>
+									<div className="flex justify-between items-center text-gray-500 text-xs">
+										<span className="flex items-center gap-1.5">
+											<svg
+												className="w-4 h-4"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth="2"
+													d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+												/>
+											</svg>
+											{news.date || "Unknown"}
+										</span>
+									</div>
+								</div>
+							</motion.div>
+						))}
+					</AnimatePresence>
+				</motion.div>
 
 				{/* Load More */}
 				{visibleCount < filteredNews.length && (
@@ -283,14 +279,14 @@ export default function News() {
 										>
 											{selectedNews?.title}
 										</Dialog.Title>
-										<div className="relative w-full h-64">
+										<div className="relative w-full h-64 mb-4">
 											<img
 												src={selectedNews?.image}
 												alt="modal-img"
 												className="absolute inset-0 w-full h-full object-cover rounded-lg"
 											/>
 										</div>
-										<p className="text-gray-600 text-sm my-6">
+										<p className="text-gray-600 text-sm mb-6">
 											{selectedNews?.description}
 										</p>
 										<button

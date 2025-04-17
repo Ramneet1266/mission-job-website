@@ -5,6 +5,7 @@ import { collection, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { Dialog, Transition } from "@headlessui/react"
 import { Fragment } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 
 type CardItem = {
 	id: number
@@ -109,6 +110,11 @@ export default function Information() {
 		)
 	}
 
+	const itemVariants = {
+		hidden: { opacity: 0, y: 20 },
+		visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+	}
+
 	return (
 		<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
 			<div className="max-w-7xl mx-auto">
@@ -120,7 +126,10 @@ export default function Information() {
 				<div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
 					<div className="space-x-2">
 						<button
-							onClick={() => setFilter("latest")}
+							onClick={() => {
+								setFilter("latest")
+								setCurrentPage(1)
+							}}
 							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
 								filter === "latest"
 									? "bg-blue-700 text-white"
@@ -130,7 +139,10 @@ export default function Information() {
 							Latest
 						</button>
 						<button
-							onClick={() => setFilter("oldest")}
+							onClick={() => {
+								setFilter("oldest")
+								setCurrentPage(1)
+							}}
 							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
 								filter === "oldest"
 									? "bg-blue-700 text-white"
@@ -140,7 +152,10 @@ export default function Information() {
 							Oldest
 						</button>
 						<button
-							onClick={() => setFilter("most")}
+							onClick={() => {
+								setFilter("most")
+								setCurrentPage(1)
+							}}
 							className={`px-4 py-2 rounded-lg border text-sm font-medium ${
 								filter === "most"
 									? "bg-blue-700 text-white"
@@ -164,73 +179,71 @@ export default function Information() {
 				</div>
 
 				{/* Card Grid */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-					{currentCards.map((card) => (
-						<div
-							key={card.id}
-							className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
-						>
-							<div className="relative w-full h-56">
-								<img
-									src={card.image}
-									alt={card.title}
-									className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-									onError={(e) =>
-										console.error("Image load error:", card.image, e)
-									}
-								/>
-								<button
-									onClick={() => setSelectedCard(card)}
-									className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
-								>
-									Read More
-								</button>
-							</div>
-							<div className="p-5">
-								<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
-									{card.title}
-								</h2>
-								<p className="text-gray-600 text-sm mb-4 line-clamp-3">
-									{card.description}
-								</p>
-								<div className="flex justify-between items-center text-gray-500 text-xs">
-									<span className="flex items-center gap-1.5">
-										<svg
-											className="w-4 h-4"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-											/>
-										</svg>
-										{card.date || "Unknown"}
-									</span>
-									<span className="flex items-center gap-1.5">
-										<svg
-											className="w-4 h-4"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-											/>
-										</svg>
-										{card.searchCount ?? 0}
-									</span>
+				<motion.div
+					className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+					initial="hidden"
+					animate="visible"
+				>
+					<AnimatePresence>
+						{currentCards.map((card) => (
+							<motion.div
+								key={card.id}
+								variants={itemVariants}
+								initial="hidden"
+								animate="visible"
+								exit="hidden"
+								className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
+							>
+								<div className="relative w-full h-56">
+									<img
+										src={card.image}
+										alt={card.title}
+										className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+										onError={(e) =>
+											console.error(
+												"Image load error:",
+												card.image,
+												e
+											)
+										}
+									/>
+									<button
+										onClick={() => setSelectedCard(card)}
+										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+									>
+										Read More
+									</button>
 								</div>
-							</div>
-						</div>
-					))}
-				</div>
+								<div className="p-5">
+									<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
+										{card.title}
+									</h2>
+									<p className="text-gray-600 text-sm mb-4 line-clamp-3">
+										{card.description}
+									</p>
+									<div className="flex justify-between items-center text-gray-500 text-xs">
+										<span className="flex items-center gap-1.5">
+											<svg
+												className="w-4 h-4"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth="2"
+													d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+												/>
+											</svg>
+											{card.date || "Unknown"}
+										</span>
+									</div>
+								</div>
+							</motion.div>
+						))}
+					</AnimatePresence>
+				</motion.div>
 
 				{/* Pagination */}
 				{totalPages > 1 && (
