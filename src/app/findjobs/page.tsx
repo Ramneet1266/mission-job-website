@@ -364,9 +364,13 @@ export default function JobFilterBar() {
     )
 
     return (
-        <div className="mt-20 h-[calc(100vh-2rem)] bg-gradient-to-br from-blue-50 to-white">
+        <div className="mt-28 min-h-screen bg-gradient-to-br from-blue-50 to-white pb-16">
+            {/* Main container: mt-28 (7rem) to clear navbar (adjust if navbar height differs) */}
+            {/* pb-16 (4rem) to avoid footer overlap (adjust if footer height differs) */}
             {/* FILTER BAR */}
-            <div className="border-b-2 border-blue-200 py-4 flex justify-center bg-white shadow-sm sticky top-0 z-20 rounded-b-md">
+            <div className="border-b-2 border-blue-200 py-4 flex justify-center bg-white shadow-sm sticky top-24 z-60 rounded-b-md">
+                {/* Filter bar: top-24 (6rem) to position below navbar (adjust if navbar height differs) */}
+                {/* z-60 to ensure visibility above navbar (adjust if navbar z-index > 50) */}
                 <div className="flex gap-2 flex-wrap justify-center">
                     {([
                         {
@@ -411,7 +415,8 @@ export default function JobFilterBar() {
                                 <ChevronDown size={16} className="text-gray-600" />
                             </button>
                             {activeFilter === filter.label && (
-                                <div className="absolute left-0 top-full mt-2 w-40 bg-white shadow-md rounded-lg border border-gray-200 z-30">
+                                <div className="absolute left-0 top-full mt-2 w-40 bg-white shadow-md rounded-lg border border-gray-200 z-70">
+                                    {/* Dropdown: z-70 to appear above filter bar (adjust if needed) */}
                                     {filter.options.map((option) => (
                                         <div
                                             key={option}
@@ -437,7 +442,8 @@ export default function JobFilterBar() {
             </div>
 
             {/* SEARCH INPUT TAGS AND FILTER TAGS */}
-            <div className="py-3 px-5 bg-white shadow-md rounded-lg flex gap-2 flex-wrap">
+            <div className="py-3 px-5 bg-white shadow-md rounded-lg flex gap-2 flex-wrap max-h-24 overflow-y-auto">
+                {/* Tags section: max-h-24 to prevent excessive growth */}
                 {/* Search Query Tags */}
                 {searchQuery.query && (
                     <Tag

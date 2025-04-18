@@ -156,7 +156,7 @@ export default function JobSearchPage() {
     }
 
     return (
-        <div className="bg-gradient-to-b from-white via-blue-50 to-white pt-8 px-6">
+        <div className="bg-gradient-to-b from-white via-blue-50 to-white pt-4 px-6">
             <div className="max-w-6xl mx-auto space-y-12">
                 <Section
                     title="Jobs by Categories"

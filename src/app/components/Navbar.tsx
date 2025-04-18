@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
-import { User as UserIcon } from "lucide-react"
+import { User as UserIcon, LogOut } from "lucide-react" // Import LogOut icon
 import {
 	auth,
 	onAuthStateChanged,
@@ -11,17 +11,8 @@ import {
 	db,
 } from "../lib/firebase"
 import { useRouter } from "next/navigation"
-import {
-	doc,
-	getDoc,
-	updateDoc,
-} from "firebase/firestore"
-import {
-	getStorage,
-	ref,
-	uploadBytes,
-	getDownloadURL,
-} from "firebase/storage"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 export default function Navbar() {
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -112,29 +103,12 @@ export default function Navbar() {
 					Mission<span className="text-blue-400">●</span>Job
 				</Link>
 
-				<div className="flex space-x-6 font-medium text-black">
-					<Link href="/" className="hover:text-blue-600 transition cursor-pointer">
-						Home
-					</Link>
-					<Link href="/gallery" className="hover:text-blue-600 transition cursor-pointer">
-						Gallery
-					</Link>
-					<div className="relative" ref={dropdownRef}>
-						<Link href="/findjobs">
-							<button
-								onClick={() => setIsDropdownOpen((prev) => !prev)}
-								className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition"
-							>
-								Find Jobs
-							</button>
-						</Link>
-					</div>
-					<Link href="/information" className="hover:text-blue-600 transition cursor-pointer">
-						Information
-					</Link>
-					<Link href="/news" className="hover:text-blue-600 transition cursor-pointer">
-						News
-					</Link>
+				<div className="flex space-x-6 font-medium text-black items-center">
+					<Link href="/" className="hover:text-blue-600 transition cursor-pointer">Home</Link>
+					<Link href="/gallery" className="hover:text-blue-600 transition cursor-pointer">Gallery</Link>
+					<Link href="/findjobs" className="hover:text-blue-600 transition cursor-pointer">Find Jobs</Link>
+					<Link href="/information" className="hover:text-blue-600 transition cursor-pointer">Information</Link>
+					<Link href="/news" className="hover:text-blue-600 transition cursor-pointer">News</Link>
 				</div>
 			</div>
 
@@ -162,9 +136,10 @@ export default function Navbar() {
 						{/* Logout */}
 						<button
 							onClick={handleLogout}
-							className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-md border border-blue-300 hover:bg-blue-200 transition text-sm"
+							className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-md border border-blue-300 hover:bg-blue-200 transition text-sm flex items-center"
 						>
-							🚪 Logout
+							<LogOut size={16} className="mr-2" />
+							Logout
 						</button>
 
 						{/* Username */}
