@@ -11,8 +11,8 @@ export default function page() {
 	return (
 		<>
 			<HeroSection />
-			<ImageSlider />
 			<FeaturedCompanies />
+			<ImageSlider />
 			<AboutUs />
 			<Blogs />
 		</>

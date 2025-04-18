@@ -18,7 +18,6 @@ const ImageSlider = () => {
 		fetchImages()
 	}, [])
 
-	// Auto-slide every 3 seconds
 	useEffect(() => {
 		const slideInterval = setInterval(() => {
 			setCurrentIndex(
@@ -29,7 +28,6 @@ const ImageSlider = () => {
 		return () => clearInterval(slideInterval)
 	}, [images.length])
 
-	// Render a grid of 4 images
 	const renderGrid = (index: number) => {
 		const startIndex = index * 4
 		const endIndex = startIndex + 4
@@ -38,13 +36,12 @@ const ImageSlider = () => {
 				<img
 					src={url}
 					alt={`Slide image ${startIndex + idx}`}
-					className="w-full h-64 object-cover border-4 border-white  rounded-[1rem] transition-transform duration-300 hover:scale-105"
+					className="w-full h-64 object-cover border-4 border-white rounded-[1rem] transition-transform duration-300 hover:scale-105"
 				/>
 			</div>
 		))
 	}
 
-	// Navigation functions
 	const goToPrevious = () => {
 		setCurrentIndex((prevIndex) =>
 			prevIndex === 0
@@ -60,7 +57,7 @@ const ImageSlider = () => {
 	}
 
 	return (
-		<div className="w-full pb-3 flex items-center justify-center bg-gray-100 relative">
+		<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center relative " >
 			<div className="relative w-full max-w-[90vw] mx-auto">
 				<div className="overflow-hidden">
 					<div
@@ -72,7 +69,7 @@ const ImageSlider = () => {
 						{[...Array(Math.ceil(images.length / 4))].map(
 							(_, idx) => (
 								<div key={idx} className="min-w-full">
-									<div className="grid grid-cols-2 md:grid-cols-4">
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 										{renderGrid(idx)}
 									</div>
 								</div>

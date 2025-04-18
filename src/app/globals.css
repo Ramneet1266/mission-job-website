@@ -47,3 +47,33 @@ body {
 	background: #fff;
 	opacity: 1;
 }
+.goog-te-gadget-simple {
+	white-space: nowrap !important;
+	display: inline-flex !important;
+	gap: 0.3rem !important;
+	width: 144px !important;
+	height: 27px !important;
+}
+.goog-te-gadget-icon {
+	display: none !important;
+}
+.goog-te-gadget-simple span > span:nth-child(3) {
+	color: blue;
+	color: rgb(155, 155, 155);
+	position: relative;
+	left: 7rem;
+	top: -2.5rem;
+}
+
+span[aria-hidden="true"] {
+	display: none;
+}
+span[aria-hidden="false"] {
+	display: none;
+}
+/* span {
+	display: none;
+} */
+a > span:nth-child(3) {
+	display: none;
+}

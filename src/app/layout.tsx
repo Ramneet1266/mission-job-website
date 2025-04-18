@@ -1,4 +1,5 @@
 "use client"
+
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import Footer from "./components/Footer"
@@ -17,17 +18,47 @@ export default function RootLayout({
 	const pathname = usePathname()
 	const hideLayout = pathname === "/login" || pathname === "/signup"
 
+	// Load Google Translate Script
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			setLoading(false)
-		}, 1500)
+		if (!document.getElementById("google-translate-script")) {
+			const script = document.createElement("script")
+			script.id = "google-translate-script"
+			script.src =
+				"//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+			document.body.appendChild(script)
+			;(window as any).googleTranslateElementInit = () => {
+				new (window as any).google.translate.TranslateElement(
+					{
+						pageLanguage: "en",
+						includedLanguages: "en,hi",
+						layout: (window as any).google.translate.TranslateElement
+							.InlineLayout.SIMPLE,
+					},
+					"google_translate_element"
+				)
+			}
+		}
+	}, [])
 
+	useEffect(() => {
+		const timer = setTimeout(() => setLoading(false), 500)
 		return () => clearTimeout(timer)
 	}, [])
 
 	return (
 		<html lang="en">
 			<body>
+				{/* Google Translate widget container */}
+				<div
+					id="google_translate_element"
+					style={{
+						position: "fixed",
+						top: 18,
+						right: 10,
+						zIndex: 1000,
+					}}
+				/>
+
 				{loading ? (
 					<Loading />
 				) : (
