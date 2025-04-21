@@ -20,20 +20,13 @@ export default function RootLayout({
 
 	// Load Google Translate Script
 	useEffect(() => {
-		const addGoogleTranslateScript = () => {
-			if (!document.getElementById("google-translate-script")) {
-				const script = document.createElement("script")
-				script.id = "google-translate-script"
-				script.src =
-					"//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
-				script.async = true
-				document.body.appendChild(script)
-			}
-		}
-
-		// Initialize Google Translate
-		;(window as any).googleTranslateElementInit = () => {
-			if (document.getElementById("google_translate_element")) {
+		if (!document.getElementById("google-translate-script")) {
+			const script = document.createElement("script")
+			script.id = "google-translate-script"
+			script.src =
+				"//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+			document.body.appendChild(script)
+			;(window as any).googleTranslateElementInit = () => {
 				new (window as any).google.translate.TranslateElement(
 					{
 						pageLanguage: "en",
@@ -43,25 +36,6 @@ export default function RootLayout({
 					},
 					"google_translate_element"
 				)
-			}
-		}
-
-		addGoogleTranslateScript()
-
-		// Cleanup script on component unmount
-		return () => {
-			const script = document.getElementById(
-				"google-translate-script"
-			)
-			if (script) {
-				script.remove()
-			}
-			// Remove Google Translate widget
-			const translateElement = document.getElementById(
-				"google_translate_element"
-			)
-			if (translateElement) {
-				translateElement.innerHTML = ""
 			}
 		}
 	}, [])
