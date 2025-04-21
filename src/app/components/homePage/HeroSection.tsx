@@ -5,9 +5,16 @@ import { db, collection, getDocs } from "../../lib/firebase"
 
 export default function HeroSection() {
 	const [categories, setCategories] = useState<string[]>([])
+	const [categoryTags, setCategoryTags] = useState<
+		Record<string, string[]>
+	>({})
 	const [cities, setCities] = useState<string[]>([])
 	const [query, setQuery] = useState("")
 	const [location, setLocation] = useState("")
+	const [selectedCategory, setSelectedCategory] = useState<
+		string | null
+	>(null)
+	const [selectedTag, setSelectedTag] = useState<string | null>(null)
 	const [showCategoryDropdown, setShowCategoryDropdown] =
 		useState(false)
 	const [showLocationDropdown, setShowLocationDropdown] =
@@ -22,6 +29,7 @@ export default function HeroSection() {
 			const snapshot = await getDocs(collection(db, "categories"))
 			const catSet = new Set<string>()
 			const citySet = new Set<string>()
+			const tagMap: Record<string, string[]> = {}
 
 			for (const doc of snapshot.docs) {
 				const data = doc.data()
@@ -30,29 +38,39 @@ export default function HeroSection() {
 				const postingsSnapshot = await getDocs(
 					collection(db, "categories", doc.id, "posting")
 				)
+				const tags: string[] = []
 				postingsSnapshot.docs.forEach((postingDoc) => {
 					const postingData = postingDoc.data()
 					if (postingData.city) citySet.add(postingData.city)
+					if (postingData.tags && Array.isArray(postingData.tags)) {
+						tags.push(...postingData.tags)
+					}
 				})
+				if (data.title && tags.length > 0) {
+					tagMap[data.title] = [...new Set(tags)] // Ensure unique tags per category
+				}
 			}
 
 			setCategories(Array.from(catSet))
+			setCategoryTags(tagMap)
+			console.log(categoryTags)
+
 			setCities(Array.from(citySet))
 		}
 		fetchData()
 	}, [])
 
 	useEffect(() => {
-		const handleClickOutside = (event: any) => {
+		const handleClickOutside = (event: MouseEvent) => {
 			if (
 				categoryRef.current &&
-				!categoryRef.current.contains(event.target)
+				!categoryRef.current.contains(event.target as Node)
 			) {
 				setShowCategoryDropdown(false)
 			}
 			if (
 				locationRef.current &&
-				!locationRef.current.contains(event.target)
+				!locationRef.current.contains(event.target as Node)
 			) {
 				setShowLocationDropdown(false)
 			}
@@ -73,12 +91,30 @@ export default function HeroSection() {
 	}
 
 	const filteredCategories = categories.filter((cat) =>
-		cat.toLowerCase().startsWith(query.toLowerCase())
+		cat.toLowerCase().includes(query.toLowerCase())
+	)
+
+	// Flatten all tags for global filtering
+	const allTags = Object.values(categoryTags).flat()
+	const filteredTags = allTags.filter((tag) =>
+		query ? tag.toLowerCase().includes(query.toLowerCase()) : true
 	)
 
 	const filteredCities = cities.filter((city) =>
-		city.toLowerCase().startsWith(location.toLowerCase())
+		city.toLowerCase().includes(location.toLowerCase())
 	)
+
+	const handleItemSelect = (item: string, isCategory: boolean) => {
+		if (isCategory) {
+			setQuery(item)
+			setSelectedCategory(item)
+			setSelectedTag(null) // Reset tag when selecting a new category
+		} else {
+			setQuery(item)
+			setSelectedTag(item)
+			setShowCategoryDropdown(false) // Close only after selecting a tag
+		}
+	}
 
 	return (
 		<section
@@ -112,23 +148,57 @@ export default function HeroSection() {
 								/>
 								{showCategoryDropdown && (
 									<ul className="absolute z-[9999] left-0 right-0 bg-white max-h-60 overflow-auto shadow-xl border border-gray-300 rounded-md text-sm font-medium text-gray-700 mt-1">
+										<h3 className="px-4 py-2 text-sm font-semibold text-black text-left">
+											Categories
+										</h3>
 										{filteredCategories.length > 0 ? (
 											filteredCategories.map((cat, idx) => (
 												<li
 													key={idx}
-													onClick={() => {
-														setQuery(cat)
-														setShowCategoryDropdown(false)
-													}}
+													onClick={() => handleItemSelect(cat, true)}
 													className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
 												>
 													{cat}
 												</li>
 											))
-										) : (
+										) : query ? null : (
 											<li className="px-4 py-2 text-gray-400 italic">
 												No match found
 											</li>
+										)}
+										<h4 className="px-4 py-2 text-sm font-semibold text-black text-left">
+											Tags
+										</h4>
+										{selectedCategory &&
+										categoryTags[selectedCategory] &&
+										categoryTags[selectedCategory].length > 0 ? (
+											categoryTags[selectedCategory].map(
+												(tag, idx) => (
+													<li
+														key={idx}
+														onClick={() =>
+															handleItemSelect(tag, false)
+														}
+														className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
+													>
+														{tag}
+													</li>
+												)
+											)
+										) : query && filteredTags.length === 0 ? (
+											<li className="px-4 py-2 text-gray-400 italic">
+												Nothing is found
+											</li>
+										) : (
+											filteredTags.map((tag, idx) => (
+												<li
+													key={idx}
+													onClick={() => handleItemSelect(tag, false)}
+													className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
+												>
+													{tag}
+												</li>
+											))
 										)}
 									</ul>
 								)}
