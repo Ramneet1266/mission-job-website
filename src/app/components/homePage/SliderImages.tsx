@@ -1,24 +1,37 @@
 "use client"
+
 import { db } from "@/app/lib/firebase"
 import { collection, getDocs } from "firebase/firestore"
 import React, { useEffect, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import useSWR from "swr"
+
+// SWR fetcher for Firestore
+const fetchImages = async () => {
+	const querySnapshot = await getDocs(collection(db, "images"))
+	const imgUrls = querySnapshot.docs.map(
+		(doc) => doc.data().url as string
+	)
+	return imgUrls
+}
 
 const ImageSlider = () => {
-	const [images, setImages] = useState<string[]>([])
+	// Use SWR to fetch and cache image URLs
+	const {
+		data: images = [],
+		isLoading,
+		error,
+	} = useSWR("images", fetchImages, {
+		revalidateOnFocus: false, // Prevent revalidation on window focus
+		dedupingInterval: 60000, // Cache for 1 minute
+		fallbackData: [], // Initial empty state
+	})
+
 	const [currentIndex, setCurrentIndex] = useState(0)
 
 	useEffect(() => {
-		const fetchImages = async () => {
-			const querySnapshot = await getDocs(collection(db, "images"))
-			const imgUrls = querySnapshot.docs.map((doc) => doc.data().url)
-			setImages(imgUrls)
-		}
+		if (isLoading || error || images.length === 0) return
 
-		fetchImages()
-	}, [])
-
-	useEffect(() => {
 		const slideInterval = setInterval(() => {
 			setCurrentIndex(
 				(prevIndex) => (prevIndex + 1) % Math.ceil(images.length / 4)
@@ -26,7 +39,7 @@ const ImageSlider = () => {
 		}, 3000)
 
 		return () => clearInterval(slideInterval)
-	}, [images.length])
+	}, [isLoading, error, images.length])
 
 	const renderGrid = (index: number) => {
 		const startIndex = index * 4
@@ -56,8 +69,38 @@ const ImageSlider = () => {
 		)
 	}
 
+	if (isLoading) {
+		return (
+			<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center">
+				<div className="text-gray-600 text-lg">
+					<span>Loading images...</span>
+				</div>
+			</div>
+		)
+	}
+
+	if (error) {
+		return (
+			<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center">
+				<div className="text-red-600 text-lg">
+					<span>Failed to load images</span>
+				</div>
+			</div>
+		)
+	}
+
+	if (images.length === 0) {
+		return (
+			<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center">
+				<div className="text-gray-600 text-lg">
+					<span>No images found</span>
+				</div>
+			</div>
+		)
+	}
+
 	return (
-		<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center relative " >
+		<div className="w-full bg-blue-50 py-10 mt-[25px] flex items-center justify-center relative">
 			<div className="relative w-full max-w-[90vw] mx-auto">
 				<div className="overflow-hidden">
 					<div

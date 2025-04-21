@@ -1,14 +1,62 @@
 "use client"
+
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { db, collection, getDocs } from "../../lib/firebase"
+import useSWR from "swr"
+
+interface HeroData {
+	categories: string[]
+	categoryTags: Record<string, string[]>
+	cities: string[]
+}
+
+// SWR fetcher for Firestore
+const fetchHeroData = async () => {
+	const snapshot = await getDocs(collection(db, "categories"))
+	const catSet = new Set<string>()
+	const citySet = new Set<string>()
+	const tagMap: Record<string, string[]> = {}
+
+	for (const doc of snapshot.docs) {
+		const data = doc.data()
+		if (data.title) catSet.add(data.title)
+
+		const postingsSnapshot = await getDocs(
+			collection(db, "categories", doc.id, "posting")
+		)
+		const tags: string[] = []
+		postingsSnapshot.docs.forEach((postingDoc) => {
+			const postingData = postingDoc.data()
+			if (postingData.city) citySet.add(postingData.city)
+			if (postingData.tags && Array.isArray(postingData.tags)) {
+				tags.push(...postingData.tags)
+			}
+		})
+		if (data.title && tags.length > 0) {
+			tagMap[data.title] = [...new Set(tags)] // Ensure unique tags per category
+		}
+	}
+
+	return {
+		categories: Array.from(catSet),
+		categoryTags: tagMap,
+		cities: Array.from(citySet),
+	}
+}
 
 export default function HeroSection() {
-	const [categories, setCategories] = useState<string[]>([])
-	const [categoryTags, setCategoryTags] = useState<
-		Record<string, string[]>
-	>({})
-	const [cities, setCities] = useState<string[]>([])
+	// Use SWR to fetch and cache hero data
+	const { data, isLoading } = useSWR<HeroData>(
+		"hero-data",
+		fetchHeroData,
+		{
+			revalidateOnFocus: false, // Prevent revalidation on window focus
+			dedupingInterval: 60000, // Cache for 1 minute
+			fallbackData: { categories: [], categoryTags: {}, cities: [] }, // Initial empty state
+		}
+	)
+
 	const [query, setQuery] = useState("")
 	const [location, setLocation] = useState("")
 	const [selectedCategory, setSelectedCategory] = useState<
@@ -23,42 +71,6 @@ export default function HeroSection() {
 	const categoryRef = useRef<HTMLDivElement>(null)
 	const locationRef = useRef<HTMLDivElement>(null)
 	const router = useRouter()
-
-	useEffect(() => {
-		const fetchData = async () => {
-			const snapshot = await getDocs(collection(db, "categories"))
-			const catSet = new Set<string>()
-			const citySet = new Set<string>()
-			const tagMap: Record<string, string[]> = {}
-
-			for (const doc of snapshot.docs) {
-				const data = doc.data()
-				if (data.title) catSet.add(data.title)
-
-				const postingsSnapshot = await getDocs(
-					collection(db, "categories", doc.id, "posting")
-				)
-				const tags: string[] = []
-				postingsSnapshot.docs.forEach((postingDoc) => {
-					const postingData = postingDoc.data()
-					if (postingData.city) citySet.add(postingData.city)
-					if (postingData.tags && Array.isArray(postingData.tags)) {
-						tags.push(...postingData.tags)
-					}
-				})
-				if (data.title && tags.length > 0) {
-					tagMap[data.title] = [...new Set(tags)] // Ensure unique tags per category
-				}
-			}
-
-			setCategories(Array.from(catSet))
-			setCategoryTags(tagMap)
-			console.log(categoryTags)
-
-			setCities(Array.from(citySet))
-		}
-		fetchData()
-	}, [])
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -90,19 +102,21 @@ export default function HeroSection() {
 		)
 	}
 
-	const filteredCategories = categories.filter((cat) =>
-		cat.toLowerCase().includes(query.toLowerCase())
-	)
+	const filteredCategories =
+		data?.categories.filter((cat) =>
+			cat.toLowerCase().includes(query.toLowerCase())
+		) || []
 
 	// Flatten all tags for global filtering
-	const allTags = Object.values(categoryTags).flat()
+	const allTags = Object.values(data?.categoryTags || {}).flat()
 	const filteredTags = allTags.filter((tag) =>
 		query ? tag.toLowerCase().includes(query.toLowerCase()) : true
 	)
 
-	const filteredCities = cities.filter((city) =>
-		city.toLowerCase().includes(location.toLowerCase())
-	)
+	const filteredCities =
+		data?.cities.filter((city) =>
+			city.toLowerCase().includes(location.toLowerCase())
+		) || []
 
 	const handleItemSelect = (item: string, isCategory: boolean) => {
 		if (isCategory) {
@@ -129,7 +143,7 @@ export default function HeroSection() {
 				/>
 				<div className="flex-1 text-center relative">
 					<h1 className="text-3xl md:text-4xl font-bold text-blue-900 mb-5">
-						Search For Jobs
+						<span>Search For Jobs</span>
 					</h1>
 					<form onSubmit={handleSubmit}>
 						<div className="relative z-30 bg-white shadow-lg rounded-full overflow-visible flex items-center divide-x divide-gray-300 max-w-4xl mx-auto">
@@ -149,30 +163,39 @@ export default function HeroSection() {
 								{showCategoryDropdown && (
 									<ul className="absolute z-[9999] left-0 right-0 bg-white max-h-60 overflow-auto shadow-xl border border-gray-300 rounded-md text-sm font-medium text-gray-700 mt-1">
 										<h3 className="px-4 py-2 text-sm font-semibold text-black text-left">
-											Categories
+											<span>Categories</span>
 										</h3>
-										{filteredCategories.length > 0 ? (
+										{isLoading ? (
+											<li className="px-4 py-2 text-gray-400 italic">
+												<span>Loading...</span>
+											</li>
+										) : filteredCategories.length > 0 ? (
 											filteredCategories.map((cat, idx) => (
 												<li
 													key={idx}
 													onClick={() => handleItemSelect(cat, true)}
 													className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
 												>
-													{cat}
+													<span>{cat}</span>
 												</li>
 											))
-										) : query ? null : (
+										) : query ? (
 											<li className="px-4 py-2 text-gray-400 italic">
-												No match found
+												<span>No match found</span>
 											</li>
-										)}
+										) : null}
 										<h4 className="px-4 py-2 text-sm font-semibold text-black text-left">
-											Tags
+											<span>Tags</span>
 										</h4>
-										{selectedCategory &&
-										categoryTags[selectedCategory] &&
-										categoryTags[selectedCategory].length > 0 ? (
-											categoryTags[selectedCategory].map(
+										{isLoading ? (
+											<li className="px-4 py-2 text-gray-400 italic">
+												<span>Loading...</span>
+											</li>
+										) : selectedCategory &&
+										  data?.categoryTags[selectedCategory] &&
+										  data.categoryTags[selectedCategory].length >
+												0 ? (
+											data.categoryTags[selectedCategory].map(
 												(tag, idx) => (
 													<li
 														key={idx}
@@ -181,13 +204,13 @@ export default function HeroSection() {
 														}
 														className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
 													>
-														{tag}
+														<span>{tag}</span>
 													</li>
 												)
 											)
 										) : query && filteredTags.length === 0 ? (
 											<li className="px-4 py-2 text-gray-400 italic">
-												Nothing is found
+												<span>Nothing is found</span>
 											</li>
 										) : (
 											filteredTags.map((tag, idx) => (
@@ -196,7 +219,7 @@ export default function HeroSection() {
 													onClick={() => handleItemSelect(tag, false)}
 													className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
 												>
-													{tag}
+													<span>{tag}</span>
 												</li>
 											))
 										)}
@@ -219,7 +242,11 @@ export default function HeroSection() {
 								/>
 								{showLocationDropdown && (
 									<ul className="absolute z-[9999] left-0 right-0 bg-white max-h-60 overflow-auto shadow-xl border border-gray-300 rounded-md text-sm font-medium text-gray-700 mt-1">
-										{filteredCities.length > 0 ? (
+										{isLoading ? (
+											<li className="px-4 py-2 text-gray-400 italic">
+												<span>Loading...</span>
+											</li>
+										) : filteredCities.length > 0 ? (
 											filteredCities.map((city, idx) => (
 												<li
 													key={idx}
@@ -229,12 +256,12 @@ export default function HeroSection() {
 													}}
 													className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-colors duration-150"
 												>
-													{city}
+													<span>{city}</span>
 												</li>
 											))
 										) : (
 											<li className="px-4 py-2 text-gray-400 italic">
-												No match found
+												<span>No match found</span>
 											</li>
 										)}
 									</ul>
@@ -246,7 +273,7 @@ export default function HeroSection() {
 								type="submit"
 								className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 font-semibold"
 							>
-								Search
+								<span>Search</span>
 							</button>
 						</div>
 					</form>
