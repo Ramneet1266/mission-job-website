@@ -1,95 +1,92 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+import useSWR from "swr"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { db, collection, getDocs } from "../../lib/firebase"
 
+// Fetcher function to get data from Firestore
+const fetchCategories = async () => {
+	const snapshot = await getDocs(collection(db, "categories"))
+	const catSet = new Set<string>()
+	const tagMap: Record<string, string[]> = {}
+
+	for (const doc of snapshot.docs) {
+		const data = doc.data()
+		if (data.title) catSet.add(data.title)
+
+		const postingsSnapshot = await getDocs(
+			collection(db, "categories", doc.id, "posting")
+		)
+		const tags: string[] = []
+		postingsSnapshot.docs.forEach((postingDoc) => {
+			const postingData = postingDoc.data()
+			if (postingData.tags && Array.isArray(postingData.tags)) {
+				tags.push(...postingData.tags)
+			}
+		})
+		if (data.title && tags.length > 0) {
+			tagMap[data.title] = [...new Set(tags)] // Ensure unique tags per category
+		}
+	}
+
+	return { categories: Array.from(catSet), categoryTags: tagMap }
+}
+
+const fetchCities = async () => {
+	const snapshot = await getDocs(collection(db, "categories"))
+	const citySet = new Set<string>()
+
+	for (const doc of snapshot.docs) {
+		const postingsSnapshot = await getDocs(
+			collection(db, "categories", doc.id, "posting")
+		)
+		postingsSnapshot.docs.forEach((postingDoc) => {
+			const postingData = postingDoc.data()
+			if (postingData.city) citySet.add(postingData.city)
+		})
+	}
+
+	return Array.from(citySet)
+}
+
 export default function HeroSection() {
-	const [categories, setCategories] = useState<string[]>([])
-	const [categoryTags, setCategoryTags] = useState<
-		Record<string, string[]>
-	>({})
-	const [cities, setCities] = useState<string[]>([])
+	const { data: categoriesData, error: categoriesError } = useSWR("categories", fetchCategories)
+	const { data: cities, error: citiesError } = useSWR("cities", fetchCities)
 	const [query, setQuery] = useState("")
 	const [location, setLocation] = useState("")
-	const [selectedCategory, setSelectedCategory] = useState<
-		string | null
-	>(null)
+	const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 	const [selectedTag, setSelectedTag] = useState<string | null>(null)
-	const [showCategoryDropdown, setShowCategoryDropdown] =
-		useState(false)
-	const [showLocationDropdown, setShowLocationDropdown] =
-		useState(false)
+	const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+	const [showLocationDropdown, setShowLocationDropdown] = useState(false)
 
 	const categoryRef = useRef<HTMLDivElement>(null)
 	const locationRef = useRef<HTMLDivElement>(null)
 	const router = useRouter()
 
-	useEffect(() => {
-		const fetchData = async () => {
-			const snapshot = await getDocs(collection(db, "categories"))
-			const catSet = new Set<string>()
-			const citySet = new Set<string>()
-			const tagMap: Record<string, string[]> = {}
-
-			for (const doc of snapshot.docs) {
-				const data = doc.data()
-				if (data.title) catSet.add(data.title)
-
-				const postingsSnapshot = await getDocs(
-					collection(db, "categories", doc.id, "posting")
-				)
-				const tags: string[] = []
-				postingsSnapshot.docs.forEach((postingDoc) => {
-					const postingData = postingDoc.data()
-					if (postingData.city) citySet.add(postingData.city)
-					if (postingData.tags && Array.isArray(postingData.tags)) {
-						tags.push(...postingData.tags)
-					}
-				})
-				if (data.title && tags.length > 0) {
-					tagMap[data.title] = [...new Set(tags)] // Ensure unique tags per category
-				}
-			}
-
-			setCategories(Array.from(catSet))
-			setCategoryTags(tagMap)
-			console.log(categoryTags)
-
-			setCities(Array.from(citySet))
-		}
-		fetchData()
-	}, [])
-
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				categoryRef.current &&
-				!categoryRef.current.contains(event.target as Node)
-			) {
-				setShowCategoryDropdown(false)
-			}
-			if (
-				locationRef.current &&
-				!locationRef.current.contains(event.target as Node)
-			) {
-				setShowLocationDropdown(false)
-			}
-		}
-		document.addEventListener("mousedown", handleClickOutside)
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside)
-		}
-	}, [])
-
-	const handleSubmit = (e: React.FormEvent) => {
-		e.preventDefault()
-		router.push(
-			`/findjobs?query=${encodeURIComponent(
-				query
-			)}&location=${encodeURIComponent(location)}`
+	// Error handling
+	if (categoriesError || citiesError) {
+		return (
+			<section
+				style={{ marginTop: "0.5rem" }}
+				className="relative z-30 bg-gradient-to-b from-white to-blue-50 py-12 px-6"
+			>
+				<p className="text-red-500">Failed to load data. Please try again later.</p>
+			</section>
 		)
 	}
 
+	if (!categoriesData || !cities) {
+		return (
+			<section
+				style={{ marginTop: "0.5rem" }}
+				className="relative z-30 bg-gradient-to-b from-white to-blue-50 py-12 px-6"
+			>
+				<p className="text-gray-500">Loading data...</p>
+			</section>
+		)
+	}
+
+	const { categories, categoryTags } = categoriesData
 	const filteredCategories = categories.filter((cat) =>
 		cat.toLowerCase().includes(query.toLowerCase())
 	)
@@ -103,6 +100,15 @@ export default function HeroSection() {
 	const filteredCities = cities.filter((city) =>
 		city.toLowerCase().includes(location.toLowerCase())
 	)
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault()
+		router.push(
+			`/findjobs?query=${encodeURIComponent(
+				query
+			)}&location=${encodeURIComponent(location)}`
+		)
+	}
 
 	const handleItemSelect = (item: string, isCategory: boolean) => {
 		if (isCategory) {
