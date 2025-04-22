@@ -136,7 +136,7 @@ export default function Navbar() {
 							href="/findjobs"
 							className="hover:text-blue-600 transition"
 						>
-							Find Jobs
+							<span>Find Jobs</span>
 						</Link>
 						<Link
 							href="/information"

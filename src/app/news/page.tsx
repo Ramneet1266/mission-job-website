@@ -1,12 +1,14 @@
 "use client"
-
-import { useState, useEffect, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
+import useSWR from "swr"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { Dialog, Transition } from "@headlessui/react"
 import { Fragment } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTranslation } from "react-i18next"
 
+// Type for news items
 type NewsItem = {
 	id: string
 	title: string
@@ -18,6 +20,8 @@ type NewsItem = {
 }
 
 export default function News() {
+	const { t } = useTranslation()
+	const [currentPage, setCurrentPage] = useState(1)
 	const [filter, setFilter] = useState<
 		"latest" | "oldest" | "most" | ""
 	>("")
@@ -27,46 +31,48 @@ export default function News() {
 	const [selectedNews, setSelectedNews] = useState<NewsItem | null>(
 		null
 	)
-	const [visibleNewsCount, setVisibleNewsCount] = useState(3) // Number of items to show initially
+	const [visibleNewsCount, setVisibleNewsCount] = useState(3)
 
 	const cardsPerPage = 3
 
-	// Fetch data from Firestore
-	useEffect(() => {
-		const fetchNews = async () => {
-			try {
-				const querySnapshot = await getDocs(collection(db, "news"))
-				const news: NewsItem[] = []
-
-				querySnapshot.forEach((doc) => {
-					const data = doc.data()
-					const date = data.createdAt
-						? new Date(data.createdAt).toISOString().split("T")[0]
-						: undefined
-
-					news.push({
-						id: doc.id,
-						title: data.title || "Untitled",
-						description: data.information || "No description",
-						image:
-							data.url || "https://source.unsplash.com/400x300/?news",
-						link: "#",
-						date: date,
-						searchCount: data.searchCount || 0,
-					})
+	// Fetch data from Firestore and use SWR for caching
+	const fetchNews = async () => {
+		try {
+			const querySnapshot = await getDocs(collection(db, "news"))
+			const news: NewsItem[] = []
+			querySnapshot.forEach((doc) => {
+				const data = doc.data()
+				const date = data.createdAt
+					? new Date(data.createdAt).toISOString().split("T")[0]
+					: undefined
+				news.push({
+					id: doc.id,
+					title: data.title || "Untitled",
+					description: data.information || "No description",
+					image:
+						data.url || "https://source.unsplash.com/400x300/?news",
+					link: "#",
+					date: date,
+					searchCount: data.searchCount || 0,
 				})
-
-				console.log("Fetched news data with images:", news) // Debug log with images
-				setNewsData(news)
-			} catch (error) {
-				console.error("Error fetching news:", error)
-			} finally {
-				setLoading(false)
-			}
+			})
+			return news
+		} catch (error) {
+			console.error("Error fetching news:", error)
 		}
+	}
 
-		fetchNews()
-	}, [])
+	// Using SWR for caching the fetched news data
+	const { data, error } = useSWR("news", fetchNews, {
+		revalidateOnFocus: false,
+	})
+
+	useEffect(() => {
+		if (data) {
+			setNewsData(data)
+			setLoading(false)
+		}
+	}, [data])
 
 	const filteredNews = useMemo(() => {
 		let filtered = [...newsData]
@@ -101,11 +107,13 @@ export default function News() {
 
 		return filtered
 	}, [filter, search, newsData])
-
-	// Get the current visible news
+	const totalPages = Math.ceil(filteredNews.length / cardsPerPage)
+	const currentCards = filteredNews.slice(
+		(currentPage - 1) * cardsPerPage,
+		currentPage * cardsPerPage
+	)
 	const currentNews = filteredNews.slice(0, visibleNewsCount)
 
-	// Item animation variants
 	const itemVariants = {
 		hidden: { opacity: 0, y: 20 },
 		visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
@@ -114,7 +122,7 @@ export default function News() {
 	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<div className="text-blue-700 text-lg">Loading...</div>
+				<div className="text-blue-700 text-lg">{t("Loading...")}</div>
 			</div>
 		)
 	}
@@ -123,7 +131,7 @@ export default function News() {
 		<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
 			<div className="max-w-7xl mx-auto">
 				<h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
-					News
+					{t("News")}
 				</h1>
 
 				{/* Filter & Search */}
@@ -139,7 +147,7 @@ export default function News() {
 									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 							}`}
 						>
-							Latest
+							{t("	Latest")}
 						</button>
 						<button
 							onClick={() => {
@@ -151,7 +159,7 @@ export default function News() {
 									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 							}`}
 						>
-							Oldest
+							{t("Oldest")}
 						</button>
 						<button
 							onClick={() => {
@@ -163,7 +171,7 @@ export default function News() {
 									: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 							}`}
 						>
-							Most Searched
+							{t("Most Searched")}
 						</button>
 					</div>
 
@@ -211,7 +219,7 @@ export default function News() {
 										onClick={() => setSelectedNews(news)}
 										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
 									>
-										Read More
+										{t("		Read More")}
 									</button>
 								</div>
 								<div className="p-5">
@@ -254,7 +262,7 @@ export default function News() {
 							}
 							className="px-6 py-3 text-lg font-semibold bg-blue-600 text-white rounded-full hover:bg-blue-700 transition duration-200"
 						>
-							Show More
+							{t("Show More")}
 						</button>
 					</div>
 				)}
@@ -299,20 +307,21 @@ export default function News() {
 										<div className="relative w-full h-64">
 											<img
 												src={selectedNews?.image}
-												alt="modal-img"
-												className="absolute inset-0 w-full h-full object-cover rounded-lg"
+												alt={selectedNews?.title}
+												className="absolute inset-0 w-full h-full object-cover"
 											/>
 										</div>
-										<p className="text-gray-600 text-sm my-6">
+										<p className="text-sm text-gray-600 mt-4">
 											{selectedNews?.description}
 										</p>
-										<button
-											type="button"
-											className="w-full rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition-all duration-200"
-											onClick={() => setSelectedNews(null)}
-										>
-											Close
-										</button>
+										<div className="flex justify-end mt-4">
+											<button
+												onClick={() => setSelectedNews(null)}
+												className="px-6 py-2 text-lg font-semibold bg-blue-600 text-white rounded-full hover:bg-blue-700 transition duration-200"
+											>
+												{t("Close")}
+											</button>
+										</div>
 									</Dialog.Panel>
 								</Transition.Child>
 							</div>

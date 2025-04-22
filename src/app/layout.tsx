@@ -8,17 +8,22 @@ import WhatsappButton from "./components/WhatsappButton"
 import "./globals.css"
 import { Toaster } from "react-hot-toast"
 
-// Extend Window interface for TypeScript
-interface Window {
-	google: {
-		translate: {
-			TranslateElement: any
-			InlineLayout: {
-				SIMPLE: string
+// Extend the global Window interface safely
+declare global {
+	interface Window {
+		google?: {
+			translate: {
+				TranslateElement: {
+					prototype: any
+					new (options: any, containerId: string): void
+					InlineLayout: {
+						SIMPLE: string
+					}
+				}
 			}
 		}
+		googleTranslateElementInit?: () => void
 	}
-	googleTranslateElementInit: () => void
 }
 
 export default function RootLayout({
@@ -30,8 +35,28 @@ export default function RootLayout({
 	const hideLayout = pathname === "/login" || pathname === "/signup"
 	const [translateReady, setTranslateReady] = useState(false)
 
-	// Load Google Translate Script with delay
 	useEffect(() => {
+		// Define the global init function before loading the script
+		window.googleTranslateElementInit = () => {
+			const googleTranslate = window.google?.translate
+			if (googleTranslate?.TranslateElement) {
+				new googleTranslate.TranslateElement(
+					{
+						pageLanguage: "en",
+						includedLanguages: "en,hi",
+						layout:
+							googleTranslate.TranslateElement.InlineLayout.SIMPLE,
+						autoDisplay: false,
+					},
+					"google_translate_element"
+				)
+				setTranslateReady(true)
+			} else {
+				console.warn("Google Translate script is not ready.")
+			}
+		}
+
+		// Load Google Translate Script with delay
 		const timer = setTimeout(() => {
 			if (!document.getElementById("google-translate-script")) {
 				const script = document.createElement("script")
@@ -40,23 +65,11 @@ export default function RootLayout({
 					"//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
 				script.async = true
 				document.body.appendChild(script)
-				;(window as any).googleTranslateElementInit = () => {
-					new (window as any).google.translate.TranslateElement(
-						{
-							pageLanguage: "en",
-							includedLanguages: "en,hi",
-							layout: (window as any).google.translate
-								.TranslateElement.InlineLayout.SIMPLE,
-							autoDisplay: false,
-						},
-						"google_translate_element"
-					)
-					setTranslateReady(true)
-				}
 			} else {
 				setTranslateReady(true)
 			}
-		}, 1000) // Delay by 1 second
+		}, 1000)
+
 		return () => clearTimeout(timer)
 	}, [])
 
@@ -91,14 +104,10 @@ export default function RootLayout({
 						/>
 					</div>
 					{!hideLayout && (
-						<span>
+						<>
 							<Footer />
-						</span>
-					)}
-					{!hideLayout && (
-						<span>
 							<WhatsappButton />
-						</span>
+						</>
 					)}
 				</>
 			</body>

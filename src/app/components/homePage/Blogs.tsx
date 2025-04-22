@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import { db } from "@/app/lib/firebase"
 import { FaRegClock } from "react-icons/fa"
 import { Dialog, Transition } from "@headlessui/react"
-import useSWR from "swr"
 
 type NewsItem = {
 	id: string
@@ -18,43 +17,9 @@ type NewsItem = {
 	searchCount?: number
 }
 
-// SWR fetcher for Firestore
-const fetchNews = async () => {
-	const querySnapshot = await getDocs(collection(db, "news"))
-	const news: NewsItem[] = []
-
-	querySnapshot.forEach((doc) => {
-		const data = doc.data()
-		const date = data.createdAt
-			? new Date(data.createdAt).toISOString().split("T")[0]
-			: undefined
-
-		news.push({
-			id: doc.id,
-			title: data.title || "Untitled",
-			description: data.information || "No description",
-			image: data.url || "https://source.unsplash.com/400x300/?news",
-			link: "#",
-			date: date,
-			searchCount: data.searchCount || 0,
-		})
-	})
-
-	return news
-}
-
 export default function News() {
-	// Use SWR to fetch and cache news data
-	const {
-		data: newsData,
-		error,
-		isLoading,
-	} = useSWR("news", fetchNews, {
-		revalidateOnFocus: false, // Prevent revalidation on window focus
-		dedupingInterval: 60000, // Cache for 1 minute
-		fallbackData: [], // Initial empty array to avoid undefined
-	})
-
+	const [newsData, setNewsData] = useState<NewsItem[]>([])
+	const [loading, setLoading] = useState(true)
 	const [selectedNews, setSelectedNews] = useState<NewsItem | null>(
 		null
 	)
@@ -63,8 +28,44 @@ export default function News() {
 	const intervalRef = useRef<NodeJS.Timeout | null>(null)
 	const [isPaused, setIsPaused] = useState(false)
 
+	useEffect(() => {
+		const fetchNews = async () => {
+			try {
+				const querySnapshot = await getDocs(collection(db, "news"))
+				const news: NewsItem[] = []
+
+				querySnapshot.forEach((doc) => {
+					const data = doc.data()
+					const date = data.createdAt
+						? new Date(data.createdAt).toISOString().split("T")[0]
+						: undefined
+
+					news.push({
+						id: doc.id,
+						title: data.title || "Untitled",
+						description: data.information || "No description",
+						image:
+							data.url || "https://source.unsplash.com/400x300/?news",
+						link: "#",
+						date: date,
+						searchCount: data.searchCount || 0,
+					})
+				})
+
+				setNewsData(news)
+			} catch (error) {
+				console.error("Error fetching news:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchNews()
+	}, [])
+
 	const filteredNews = useMemo(() => {
 		let filtered = [...newsData]
+
 		return filtered
 	}, [newsData])
 
@@ -113,22 +114,10 @@ export default function News() {
 		}
 	}, [filteredNews.length, isPaused])
 
-	if (isLoading) {
+	if (loading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<div className="text-blue-700 text-lg">
-					<span>Loading...</span>
-				</div>
-			</div>
-		)
-	}
-
-	if (error) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="text-red-600 text-lg">
-					<span>Error loading news</span>
-				</div>
+				<div className="text-blue-700 text-lg">Loading...</div>
 			</div>
 		)
 	}
@@ -137,8 +126,10 @@ export default function News() {
 		<div className="py-8 px-4 bg-gradient-to-b from-gray-50 to-white">
 			<div className="max-w-7xl mx-auto">
 				<h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
-					<span>Latest News</span>
+					Latest News
 				</h1>
+
+				{/* Filters + Search */}
 
 				<div
 					className="relative"
@@ -179,19 +170,19 @@ export default function News() {
 										onClick={() => setSelectedNews(news)}
 										className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all"
 									>
-										<span>Read More</span>
+										Read More
 									</button>
 								</div>
 								<div className="p-4">
 									<h2 className="text-lg font-semibold text-blue-800 line-clamp-2 mb-1">
-										<span>{news.title}</span>
+										{news.title}
 									</h2>
 									<p className="text-sm text-gray-600 line-clamp-3 mb-3">
-										<span>{news.description}</span>
+										{news.description}
 									</p>
 									<div className="flex items-center text-xs text-gray-500">
 										<FaRegClock className="mr-1" />
-										<span>{news.date || "Unknown"}</span>
+										{news.date || "Unknown"}
 									</div>
 								</div>
 							</div>
@@ -231,7 +222,7 @@ export default function News() {
 								>
 									<Dialog.Panel className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
 										<Dialog.Title className="text-xl font-bold text-gray-900 mb-4">
-											<span>{selectedNews?.title}</span>
+											{selectedNews?.title}
 										</Dialog.Title>
 										<img
 											src={selectedNews?.image}
@@ -239,13 +230,13 @@ export default function News() {
 											className="w-full h-64 object-cover rounded-lg mb-4"
 										/>
 										<p className="text-gray-600 text-sm mb-6">
-											<span>{selectedNews?.description}</span>
+											{selectedNews?.description}
 										</p>
 										<button
 											className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
 											onClick={() => setSelectedNews(null)}
 										>
-											<span>Close</span>
+											Close
 										</button>
 									</Dialog.Panel>
 								</Transition.Child>

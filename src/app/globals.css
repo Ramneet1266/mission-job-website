@@ -94,3 +94,6 @@ a > span:nth-child(3) {
 a span {
 	color: white;
 }
+.notranslate {
+	translate: no;
+}
