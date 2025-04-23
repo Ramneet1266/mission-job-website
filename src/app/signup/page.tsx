@@ -1,111 +1,117 @@
 "use client"
 
-import { useState } from "react"
+import { User, Mail, Lock, Phone, UserPlus } from "lucide-react"
+import { useState, FormEvent } from "react"
 import { motion } from "framer-motion"
-import {
-	User,
-	Mail,
-	Lock,
-	Phone,
-	UserPlus,
-	FileText,
-} from "lucide-react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import toast from "react-hot-toast"
+import { auth, db } from "../lib/firebase"
 import {
 	createUserWithEmailAndPassword,
-	UserCredential,
+	GoogleAuthProvider,
+	signInWithPopup,
 } from "firebase/auth"
-import { auth, db, storage } from "../lib/firebase"
-import { doc, setDoc } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { addDoc, collection } from "firebase/firestore"
+import toast from "react-hot-toast"
 
-export default function Signup() {
-	const [name, setName] = useState("")
-	const [email, setEmail] = useState("")
-	const [password, setPassword] = useState("")
-	const [phone, setPhone] = useState("")
-	const [file, setFile] = useState<File | null>(null)
+export default function UserManagementPage() {
+	const [name, setName] = useState<string>("")
+	const [email, setEmail] = useState<string>("")
+	const [phoneNumber, setPhoneNumber] = useState<string>("")
+	const [password, setPassword] = useState<string>("")
+	const [loading, setLoading] = useState<boolean>(false)
 	const [error, setError] = useState<string | null>(null)
-	const [loading, setLoading] = useState(false)
 	const router = useRouter()
 
-	const handleFileChange = (
-		e: React.ChangeEvent<HTMLInputElement>
-	) => {
-		const selectedFile = e.target.files?.[0]
-		if (selectedFile) {
-			setFile(selectedFile)
-		}
-	}
-
-	const handleSignup = async (e: React.FormEvent) => {
+	const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
 		setLoading(true)
 		setError(null)
 
 		try {
-			const userCredential: UserCredential =
-				await createUserWithEmailAndPassword(auth, email, password)
-			const user = userCredential.user
-
-			let fileUrl = ""
-			if (file) {
-				const storageRef = ref(
-					storage,
-					`user-files/${user.uid}/${file.name}`
-				)
-				await uploadBytes(storageRef, file)
-				fileUrl = await getDownloadURL(storageRef)
+			if (!name || !email || !phoneNumber || !password) {
+				setError("All fields are required.")
+				return
 			}
 
-			// Store user details and file URL in Firestore
-			await setDoc(doc(db, "users", user.uid), {
+			// Create user with email and password
+			const userCredential = await createUserWithEmailAndPassword(
+				auth,
+				email,
+				password
+			)
+			const user = userCredential.user
+
+			// Store additional user info in Firestore
+			await addDoc(collection(db, "users"), {
+				uid: user.uid,
 				name,
 				email,
-				phone,
-				fileUrl: fileUrl || null,
+				phoneNumber,
 				createdAt: new Date().toISOString(),
 			})
 
-			console.log("User registered with:", user.uid)
-			toast.success("Registration successful! Redirecting...", {
-				duration: 2000,
+			toast.success("Successfully registered!")
+			setName("")
+			setEmail("")
+			setPhoneNumber("")
+			setPassword("")
+			router.push("/")
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err)
+			setError(message)
+			toast.error(`Failed to register: ${message}`)
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	const handleGoogleRegister = async () => {
+		setLoading(true)
+		setError(null)
+
+		try {
+			const provider = new GoogleAuthProvider()
+			const userCredential = await signInWithPopup(auth, provider)
+			const user = userCredential.user
+
+			// Store user info in Firestore
+			await addDoc(collection(db, "users"), {
+				uid: user.uid,
+				name: user.displayName || "Google User",
+				email: user.email || "",
+				phoneNumber: user.phoneNumber || "", // Google may not provide phone number
+				createdAt: new Date().toISOString(),
 			})
-			setTimeout(() => {
-				router.push("/") // Redirect to homepage
-			}, 2000)
-		} catch (err: any) {
-			setError(err.message || "An error occurred during registration")
-			console.error("Registration error:", err)
+
+			toast.success("Successfully registered with Google!")
+			router.push("/")
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err)
+			setError(message)
+			toast.error(`Failed to register with Google: ${message}`)
 		} finally {
 			setLoading(false)
 		}
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 flex items-center justify-center px-4">
+		<div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 flex items-center justify-center p-4">
 			<motion.div
 				initial={{ opacity: 0, y: 50 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ duration: 0.6 }}
-				className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 md:p-10"
+				className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8"
 			>
-				<h2 className="text-3xl font-bold text-blue-700 mb-1 flex items-center gap-2">
-					<UserPlus className="w-6 h-6" /> Create Account
-				</h2>
-				<p className="text-sm text-gray-500 mb-6">
-					Sign up to get started
-				</p>
+				<div className="text-center mb-6">
+					<h1 className="text-3xl font-bold text-blue-900 flex justify-center items-center gap-2">
+						<UserPlus className="w-6 h-6" />
+						Register
+					</h1>
+				</div>
 
-				{error && (
-					<div className="text-red-600 text-sm mb-4">{error}</div>
-				)}
-
-				<form onSubmit={handleSignup} className="space-y-5">
+				<form onSubmit={handleRegister} className="space-y-4">
 					<div>
-						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
 							<User className="w-4 h-4" /> Name
 						</label>
 						<input
@@ -113,14 +119,13 @@ export default function Signup() {
 							required
 							value={name}
 							onChange={(e) => setName(e.target.value)}
-							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="John Doe"
-							disabled={loading}
 						/>
 					</div>
 
 					<div>
-						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
 							<Mail className="w-4 h-4" /> Email
 						</label>
 						<input
@@ -128,29 +133,27 @@ export default function Signup() {
 							required
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
-							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="example@domain.com"
-							disabled={loading}
 						/>
 					</div>
 
 					<div>
-						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
 							<Phone className="w-4 h-4" /> Phone Number
 						</label>
 						<input
 							type="tel"
 							required
-							value={phone}
-							onChange={(e) => setPhone(e.target.value)}
-							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-							placeholder="1234567890"
-							disabled={loading}
+							value={phoneNumber}
+							onChange={(e) => setPhoneNumber(e.target.value)}
+							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+							placeholder="+1234567890"
 						/>
 					</div>
 
 					<div>
-						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
 							<Lock className="w-4 h-4" /> Password
 						</label>
 						<input
@@ -158,45 +161,45 @@ export default function Signup() {
 							required
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
-							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="••••••••"
-							disabled={loading}
 						/>
 					</div>
 
-					<div>
-						<label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-							<FileText className="w-4 h-4" /> Upload File
-						</label>
-						<input
-							type="file"
-							onChange={handleFileChange}
-							className="w-full px-4 py-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-							disabled={loading}
-						/>
-					</div>
+					{error && (
+						<p className="text-sm text-red-600 bg-red-100 px-3 py-2 rounded-md">
+							{error}
+						</p>
+					)}
 
 					<button
 						type="submit"
-						className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all disabled:bg-blue-400"
 						disabled={loading}
+						className={`w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all ${
+							loading ? "opacity-50 cursor-not-allowed" : ""
+						}`}
 					>
-						{loading ? "Signing up..." : "Sign Up"}
+						{loading ? "Processing..." : "Register"}
 					</button>
 				</form>
 
-				<p className="text-sm text-center mt-6 text-gray-600">
-					Already have an account?{" "}
-					<Link
-						href="/login"
-						className={`text-blue-600 hover:underline ${
-							loading ? "pointer-events-none text-gray-400" : ""
+				<div className="mt-4">
+					<button
+						onClick={handleGoogleRegister}
+						disabled={loading}
+						className={`w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2 ${
+							loading ? "opacity-50 cursor-not-allowed" : ""
 						}`}
-						onClick={loading ? (e) => e.preventDefault() : undefined}
 					>
-						Log in
-					</Link>
-				</p>
+						<svg className="w-5 h-5" viewBox="0 0 24 24">
+							<path
+								fill="currentColor"
+								d="M12.24 10.4V14h3.52c-.15.76-.56 1.43-1.17 1.92l1.92 1.47c1.1-.68 1.96-1.76 2.45-3.13.65-1.85.08-3.96-1.75-5.14-1.67-1.07-3.9-.84-5.37.58l1.4 1.3zm-1.5-1.3c-.9-1.22-2.38-2-4-2-2.76 0-5 2.24-5 5s2.24 5 5 5c1.62 0 3.1-.78 4-2l-1.4-1.3c-.6.8-1.56 1.3-2.6 1.3-1.76 0-3.2-1.44-3.2-3.2s1.44-3.2 3.2-3.2c1.04 0 1.98.5 2.6 1.3l1.4-1.3zm-4.9 2.9c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
+							/>
+						</svg>
+						{loading ? "Processing..." : "Register with Google"}
+					</button>
+				</div>
 			</motion.div>
 		</div>
 	)
