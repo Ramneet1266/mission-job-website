@@ -1,743 +1,342 @@
 "use client"
 
-import React, { useEffect, useState, Component, ReactNode } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { ChevronDown, X } from "lucide-react"
-import { db, collection, getDocs, auth, onAuthStateChanged } from "../lib/firebase"
-import { User } from "firebase/auth"
+import { useState, useMemo } from "react"
 import useSWR from "swr"
-import { useTranslation} from "react-i18next"
-import { TFunction } from "i18next"
+import { collection, getDocs } from "firebase/firestore"
+import { db } from "../lib/firebase"
+import { Dialog, Transition } from "@headlessui/react"
+import { Fragment } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { useTranslation } from "react-i18next"
 
-// Error Boundary Component
-class ErrorBoundary extends Component<
-  { children: ReactNode; t: TFunction<"translation", undefined> },
-  { hasError: boolean }
-> {
-  state = { hasError: false }
-
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <h1 className="text-center text-red-700 text-lg">
-          {this.props.t("errorBoundary")}
-        </h1>
-      )
-    }
-    return this.props.children
-  }
+type CardItem = {
+	id: number
+	image: string
+	title: string
+	description: string
+	date: string
+	searchCount: number
 }
 
-interface Category {
-  id: string
-  title: string
+const fetchNews = async () => {
+	const querySnapshot = await getDocs(collection(db, "news"))
+	const cards: CardItem[] = []
+
+	querySnapshot.forEach((doc) => {
+		const data = doc.data()
+		const date = new Date(data.createdAt).toISOString().split("T")[0] // Convert to YYYY-MM-DD
+
+		cards.push({
+			id: Number(doc.id) || cards.length + 1, // Use document ID or incremental ID
+			image: data.url || "https://via.placeholder.com/300x200", // Use url as image
+			title: data.title || "Untitled",
+			description: data.information || "No description",
+			date: date || "1970-01-01",
+			searchCount: data.searchCount || 0, // Default to 0 if not present
+		})
+	})
+
+	return cards
 }
 
-interface Job {
-  id: string
-  jobTitle: string
-  jobCompany: string
-  city: string
-  state: string
-  salary: string
-  tags: string[]
-  createdAt: string
-  imageUrl: string
-  jobDescription: string
-  address: string
-  category: string
-  contactEmail: string
-  contactNumber: string
-  postalCode: string
-}
+export default function Information() {
+	const { t } = useTranslation()
+	const [currentPage, setCurrentPage] = useState(1)
+	const [filter, setFilter] = useState<
+		"latest" | "oldest" | "most" | ""
+	>("")
+	const [search, setSearch] = useState("")
+	const [selectedCard, setSelectedCard] = useState<CardItem | null>(
+		null
+	)
 
-const formatTimeAgo = (createdAt: string, t: TFunction<"translation", undefined>) => {
-  const now = new Date()
-  const posted = new Date(createdAt)
-  const diffMs = now.getTime() - posted.getTime()
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  if (diffHours < 24) return t("postedHoursAgo", { hours: diffHours })
-  const diffDays = Math.floor(diffHours / 24)
-  return t("postedDaysAgo", { days: diffDays })
-}
+	const { data: cardData = [], error } = useSWR("news", fetchNews, {
+		revalidateOnFocus: false, // Disable revalidation on focus to reduce unnecessary network requests
+		refreshInterval: 0, // No automatic refresh interval
+	})
 
-// Fetcher function for SWR
-const fetchJobsAndCategories = async () => {
-  const categoriesSnapshot = await getDocs(collection(db, "categories"))
-  const categoriesData: Category[] = categoriesSnapshot.docs.map((doc) => ({
-    id: doc.id,
-    title: doc.data().title || "Untitled",
-  }))
+	const cardsPerPage = 3
 
-  const allJobs: Job[] = []
-  const citiesSet = new Set<string>()
-  const statesSet = new Set<string>()
-  const companiesSet = new Set<string>()
-  const tagsSet = new Set<string>()
+	if (error) {
+		return (
+			<span>
+				<div className="min-h-screen flex items-center justify-center">
+					<div className="text-red-700 text-lg">
+						{t("errorMessage")}
+					</div>
+				</div>
+			</span>
+		)
+	}
 
-  for (const category of categoriesSnapshot.docs) {
-    const postingsSnapshot = await getDocs(
-      collection(db, "categories", category.id, "posting")
-    )
-    postingsSnapshot.docs.forEach((doc) => {
-      const data = doc.data()
-      allJobs.push({
-        id: doc.id,
-        jobTitle: data.jobTitle || "Untitled Job",
-        jobCompany: data.jobCompany || "Unknown Company",
-        city: data.city || "",
-        state: data.state || "",
-        salary: data.salary || "Not specified",
-        tags: data.tags || [],
-        createdAt: data.createdAt || new Date().toISOString(),
-        imageUrl: data.imageUrl || "/placeholder.jpg",
-        jobDescription: data.jobDescription || "No description available",
-        address: data.address || "",
-        category: data.category || "Uncategorized",
-        contactEmail: data.contactEmail || "",
-        contactNumber: data.contactNumber || "",
-        postalCode: data.postalCode || "",
-      })
-      if (data.city) citiesSet.add(data.city)
-      if (data.state) statesSet.add(data.state)
-      if (data.jobCompany) companiesSet.add(data.jobCompany)
-      if (data.tags && Array.isArray(data.tags)) {
-        data.tags.forEach((tag: string) => tagsSet.add(tag))
-      }
-    })
-  }
+	const filteredData = useMemo(() => {
+		let filtered = [...cardData]
 
-  return {
-    categories: categoriesData,
-    jobs: allJobs,
-    cities: Array.from(citiesSet),
-    states: Array.from(statesSet),
-    companies: Array.from(companiesSet),
-    tags: Array.from(tagsSet),
-  }
-}
+		if (search) {
+			filtered = filtered.filter(
+				(card) =>
+					card.title.toLowerCase().includes(search.toLowerCase()) ||
+					card.description
+						.toLowerCase()
+						.includes(search.toLowerCase())
+			)
+		}
 
-export default function JobFilterBar() {
-  const { t } = useTranslation()
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
-  const [activeFilter, setActiveFilter] = useState<string | null>(null)
-  const [filters, setFilters] = useState<{
-    category: string
-    tags: string[]
-    city: string
-    state: string
-    salary: string
-    company: string
-  }>({
-    category: "All",
-    tags: [],
-    city: "All",
-    state: "All",
-    salary: "All",
-    company: "All",
-  })
-  const [availableTags, setAvailableTags] = useState<string[]>([])
-  const [availableCities, setAvailableCities] = useState<string[]>([])
-  const [availableStates, setAvailableStates] = useState<string[]>([])
-  const [availableCompanies, setAvailableCompanies] = useState<string[]>([])
-  const [user, setUser] = useState<User | null>(null)
+		if (filter === "latest") {
+			filtered.sort(
+				(a, b) =>
+					new Date(b.date).getTime() - new Date(a.date).getTime()
+			)
+		} else if (filter === "oldest") {
+			filtered.sort(
+				(a, b) =>
+					new Date(a.date).getTime() - new Date(b.date).getTime()
+			)
+		} else if (filter === "most") {
+			filtered.sort((a, b) => b.searchCount - a.searchCount)
+		}
 
-  // Use SWR to fetch and cache data
-  const { data, error, isLoading } = useSWR("jobsAndCategories", fetchJobsAndCategories, {
-    revalidateOnFocus: false,
-    dedupingInterval: 60000,
-  })
+		return filtered
+	}, [filter, search, cardData])
 
-  // Update state with SWR data
-  useEffect(() => {
-    if (data) {
-      setCategories(data.categories)
-      setJobs(data.jobs)
-      setAvailableCities(data.cities)
-      setAvailableStates(data.states)
-      setAvailableCompanies(data.companies)
+	const totalPages = Math.ceil(filteredData.length / cardsPerPage)
+	const currentCards = filteredData.slice(
+		(currentPage - 1) * cardsPerPage,
+		currentPage * cardsPerPage
+	)
 
-      const tagFromUrl = searchParams.get("tags")
-      const allTags = [...data.tags]
-      if (tagFromUrl && !allTags.includes(decodeURIComponent(tagFromUrl))) {
-        allTags.push(decodeURIComponent(tagFromUrl))
-      }
-      setAvailableTags(allTags)
-    }
-  }, [data, searchParams])
+	const itemVariants = {
+		hidden: { opacity: 0, y: 20 },
+		visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+	}
 
-  // Clean up Google Translate hash
-  useEffect(() => {
-    if (window.location.hash.includes("googtrans")) {
-      router.replace(`/findjobs?${searchParams.toString()}`, {
-        scroll: false,
-      })
-      console.log("Removed Google Translate hash on findjobs")
-    }
-  }, [router, searchParams])
+	return (
+		<span>
+			<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
+				<div className="max-w-7xl mx-auto">
+					<h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
+						{t("News")}
+					</h1>
 
-  // Initialize filters from URL parameters with validation
-  useEffect(() => {
-    const category = searchParams.get("category") || "All"
-    const city = searchParams.get("city") || "All"
-    const company = searchParams.get("company") || "All"
-    const tag = searchParams.get("tags") || null
+					{/* Filters + Search */}
+					<div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+						<div className="space-x-2">
+							<button
+								onClick={() => {
+									setFilter("latest")
+									setCurrentPage(1)
+								}}
+								className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+									filter === "latest"
+										? "bg-blue-700 text-white"
+										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+								}`}
+							>
+								{t("latest")}
+							</button>
+							<button
+								onClick={() => {
+									setFilter("oldest")
+									setCurrentPage(1)
+								}}
+								className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+									filter === "oldest"
+										? "bg-blue-700 text-white"
+										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+								}`}
+							>
+								{t("oldest")}
+							</button>
+							<button
+								onClick={() => {
+									setFilter("most")
+									setCurrentPage(1)
+								}}
+								className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+									filter === "most"
+										? "bg-blue-700 text-white"
+										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+								}`}
+							>
+								{t("mostSearched")}
+							</button>
+						</div>
 
-    setFilters((prev) => ({
-      ...prev,
-      category:
-        category && decodeURIComponent(category) !== "null"
-          ? decodeURIComponent(category)
-          : "All",
-      city:
-        city && decodeURIComponent(city) !== "null"
-          ? decodeURIComponent(city)
-          : "All",
-      company:
-        company && decodeURIComponent(company) !== "null"
-          ? decodeURIComponent(company)
-          : "All",
-      tags:
-        tag && decodeURIComponent(tag) !== "null"
-          ? [decodeURIComponent(tag)]
-          : [],
-    }))
-  }, [searchParams])
+						<input
+							type="text"
+							placeholder={t("searchPlaceholder")}
+							value={search}
+							onChange={(e) => {
+								setSearch(e.target.value)
+								setCurrentPage(1)
+							}}
+							className="w-full md:w-1/3 px-4 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+						/>
+					</div>
 
-  // Check auth state
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log(
-        "Auth state changed:",
-        currentUser ? "Signed in" : "Not signed in"
-      )
-      setUser(currentUser)
-    })
-    return () => unsubscribe()
-  }, [])
+					{/* Card Grid */}
+					<motion.div
+						className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+						initial="hidden"
+						animate="visible"
+					>
+						<AnimatePresence>
+							{currentCards.map((card) => (
+								<motion.div
+									key={card.id}
+									variants={itemVariants}
+									initial="hidden"
+									animate="visible"
+									exit="hidden"
+									className="group relative rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300"
+								>
+									<div className="relative w-full h-56">
+										<img
+											src={card.image}
+											alt={card.title}
+											className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+											onError={(e) =>
+												console.error(
+													"Image load error:",
+													card.image,
+													e
+												)
+											}
+										/>
+										<button
+											onClick={() => setSelectedCard(card)}
+											className="absolute top-3 right-3 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition-all duration-200"
+										>
+											{t("readMore")}
+										</button>
+									</div>
+									<div className="p-5">
+										<h2 className="text-xl font-semibold text-blue-800 mb-2 line-clamp-2">
+											{card.title}
+										</h2>
+										<p className="text-gray-600 text-sm mb-4 line-clamp-3">
+											{card.description}
+										</p>
+										<div className="flex justify-between items-center text-gray-500 text-xs">
+											<span className="flex items-center gap-1.5">
+												<svg
+													className="w-4 h-4"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														strokeLinecap="round"
+														strokeLinejoin="round"
+														strokeWidth="2"
+														d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+													/>
+												</svg>
+												{card.date || "Unknown"}
+											</span>
+										</div>
+									</div>
+								</motion.div>
+							))}
+						</AnimatePresence>
+					</motion.div>
 
-  // Handle removing a search input
-  const handleRemoveInput = (key: keyof typeof searchQuery) => {
-    const newParams = new URLSearchParams(searchParams.toString())
-    newParams.delete(key)
-    router.replace(`/findjobs?${newParams.toString()}`, {
-      scroll: false,
-    })
-  }
+					{/* Pagination for Cards */}
+					{totalPages > 1 && (
+						<div className="flex justify-center mt-8">
+							<nav
+								className="inline-flex gap-2"
+								aria-label="Pagination"
+							>
+								{Array.from({ length: totalPages }, (_, i) => {
+									const pageNum = i + 1
+									const isActive = pageNum === currentPage
 
-  // Handle removing a filter
-  const handleRemoveFilter = (key: keyof typeof filters, value?: string) => {
-    if (key === "tags" && value) {
-      setFilters((prev) => ({
-        ...prev,
-        tags: prev.tags.filter((tag) => tag !== value),
-      }))
-      const newParams = new URLSearchParams(searchParams.toString())
-      const remainingTags = filters.tags.filter((tag) => tag !== value)
-      if (remainingTags.length > 0) {
-        newParams.set("tags", encodeURIComponent(remainingTags[0]))
-      } else {
-        newParams.delete("tags")
-      }
-      router.replace(`/findjobs?${newParams.toString()}`, {
-        scroll: false,
-      })
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        [key]: key === "tags" ? [] : "All",
-      }))
-      const newParams = new URLSearchParams(searchParams.toString())
-      newParams.delete(key)
-      router.replace(`/findjobs?${newParams.toString()}`, {
-        scroll: false,
-      })
-    }
-  }
+									return (
+										<button
+											key={pageNum}
+											onClick={() => setCurrentPage(pageNum)}
+											className={`px-4 py-2 text-sm rounded-full border transition ${
+												isActive
+													? "bg-blue-700 text-white shadow-md font-semibold"
+													: "bg-white text-blue-700 border-blue-300 hover:bg-blue-100"
+											}`}
+										>
+											<span>{pageNum}</span>
+										</button>
+									)
+								})}
+							</nav>
+						</div>
+					)}
 
-  // Navigate to homepage
-  const handleBackToHome = () => {
-    router.push("/")
-  }
+					{/* Modal for Read More */}
+					<Transition
+						appear
+						show={selectedCard !== null}
+						as={Fragment}
+					>
+						<Dialog
+							as="div"
+							className="relative z-50"
+							onClose={() => setSelectedCard(null)}
+						>
+							<Transition.Child
+								as={Fragment}
+								enter="ease-out duration-300"
+								enterFrom="opacity-0"
+								enterTo="opacity-100"
+								leave="ease-in duration-200"
+								leaveFrom="opacity-100"
+								leaveTo="opacity-0"
+							>
+								<div className="fixed inset-0 bg-black/40" />
+							</Transition.Child>
 
-  // Update tags when category changes
-  useEffect(() => {
-    const filteredJobs =
-      filters.category === "All"
-        ? jobs
-        : jobs.filter((job) => job.category === filters.category)
-    const tagsFromJobs = Array.from(
-      new Set(filteredJobs.flatMap((job) => job.tags))
-    )
-    const tagFromUrl = searchParams.get("tags")
-    const tags = tagFromUrl
-      ? Array.from(new Set([...tagsFromJobs, decodeURIComponent(tagFromUrl)]))
-      : tagsFromJobs
-    setAvailableTags(tags)
-    setFilters((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((tag) => tags.includes(tag) || tag === tagFromUrl),
-    }))
-  }, [filters.category, jobs, searchParams])
-
-  // Filter jobs, including searchQuery from URL
-  const searchQuery = {
-    query: searchParams.get("query") || "",
-    location: searchParams.get("location") || "",
-    experience: searchParams.get("experience") || "Experience",
-  }
-
-  const filteredJobs = jobs.filter((job) => {
-    const matchesCategory =
-      filters.category === "All" || job.category === filters.category
-    const matchesTags =
-      filters.tags.length === 0 ||
-      filters.tags.every((tag) => job.tags.includes(tag))
-    const matchesCity = filters.city === "All" || job.city === filters.city
-    const matchesState = filters.state === "All" || job.state === filters.state
-    const matchesSalary =
-      filters.salary === "All" ||
-      (filters.salary === "Rs 0 - 20000"
-        ? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
-          ? false
-          : parseInt(job.salary.replace("Rs ", "")) <= 20000
-        : filters.salary === "Rs 20000 - 40000"
-        ? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
-          ? false
-          : parseInt(job.salary.replace("Rs ", "")) > 20000 &&
-            parseInt(job.salary.replace("Rs ", "")) <= 40000
-        : Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
-        ? false
-        : parseInt(job.salary.replace("Rs ", "")) > 40000)
-    const matchesCompany =
-      filters.company === "All" || job.jobCompany === filters.company
-
-    const query = searchQuery.query.toLowerCase().trim()
-    const matchesQuery =
-      query === "" ||
-      job.category.toLowerCase() === query ||
-      job.tags.some((tag) => tag.toLowerCase() === query) ||
-      job.jobTitle.toLowerCase().split(" ").includes(query)
-
-    const location = searchQuery.location.toLowerCase().trim()
-    const matchesLocation =
-      location === "" ||
-      job.city.toLowerCase().includes(location) ||
-      job.state.toLowerCase().includes(location)
-
-    const experience = searchQuery.experience.toLowerCase().trim()
-    const matchesExperience =
-      experience === "experience" ||
-      job.tags.some((tag) => tag.toLowerCase().includes(experience))
-
-    return (
-      matchesCategory &&
-      matchesTags &&
-      matchesCity &&
-      matchesState &&
-      matchesSalary &&
-      matchesCompany &&
-      matchesQuery &&
-      matchesLocation &&
-      matchesExperience
-    )
-  })
-
-  // Auto-select first job only if no job is selected or selected job is invalid
-  useEffect(() => {
-    console.log("Checking auto-select. Current selectedJob:", selectedJob?.id)
-    if (!filteredJobs.length) {
-      console.log("No jobs, setting selectedJob to null")
-      setSelectedJob(null)
-      return
-    }
-    if (
-      !selectedJob ||
-      !filteredJobs.some((job) => job.id === selectedJob.id)
-    ) {
-      console.log("Auto-selecting first job:", filteredJobs[0]?.id)
-      setSelectedJob({ ...filteredJobs[0] })
-    } else {
-      console.log("Keeping selected job:", selectedJob.id)
-    }
-  }, [filteredJobs, selectedJob])
-
-  type FilterKey = keyof typeof filters
-
-  const toggleFilterOption = (filter: FilterKey, value: string) => {
-    if (filter === "tags") {
-      setFilters((prev) => ({
-        ...prev,
-        tags: prev.tags.includes(value)
-          ? prev.tags.filter((t) => t !== value)
-          : [...prev.tags, value],
-      }))
-      const newParams = new URLSearchParams(searchParams.toString())
-      const newTags = filters.tags.includes(value)
-        ? filters.tags.filter((t) => t !== value)
-        : [...filters.tags, value]
-      if (newTags.length > 0) {
-        newParams.set("tags", encodeURIComponent(newTags[0]))
-      } else {
-        newParams.delete("tags")
-      }
-      router.replace(`/findjobs?${newParams.toString()}`, {
-        scroll: false,
-      })
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        [filter]: value,
-      }))
-      const newParams = new URLSearchParams(searchParams.toString())
-      newParams.set(filter, encodeURIComponent(value))
-      router.replace(`/findjobs?${newParams.toString()}`, {
-        scroll: false,
-      })
-    }
-    setActiveFilter(null)
-  }
-
-  const Tag = ({
-    label,
-    onRemove,
-  }: {
-    label: string
-    onRemove: () => void
-  }) => (
-    <div className="flex items-center bg-blue-100 text-blue-800 px-2 py-1 rounded-full shadow-sm hover:bg-blue-200 transition-all duration-200">
-      <span className="text-sm font-medium">{label}</span>
-      <button
-        onClick={onRemove}
-        className="ml-2 text-blue-600 hover:text-blue-900 transition-colors duration-200"
-      >
-        <X size={14} />
-      </button>
-    </div>
-  )
-
-  const Section = ({
-    title,
-    content,
-  }: {
-    title: string
-    content: React.ReactNode
-  }) => (
-    <div className="mb-4">
-      <h3 className="text-lg font-semibold text-blue-900 mb-1">{title}</h3>
-      <div className="text-gray-700">{content}</div>
-    </div>
-  )
-
-  return (
-    <span>
-      <div className="mt-18 min-h-screen bg-gradient-to-b from-gray-50 to-white pb-16">
-        <ErrorBoundary t={t}>
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
-              {t("findJobs")}
-            </h1>
-
-            {/* FILTER BAR */}
-            <div
-              className="border-b-2 border-blue-200 py-4 flex justify-center bg-white shadow-sm sticky top-24 z-60 rounded-b-md notranslate"
-              translate="no"
-            >
-              <div className="flex gap-2 flex-wrap justify-center">
-                {(
-                  [
-                    {
-                      label: t("categories"),
-                      key: "category",
-                      options: ["All", ...categories.map((c) => c.title)],
-                    },
-                    {
-                      label: t("tags"),
-                      key: "tags",
-                      options: availableTags,
-                    },
-                    {
-                      label: t("cities"),
-                      key: "city",
-                      options: ["All", ...availableCities],
-                    },
-                    {
-                      label: t("states"),
-                      key: "state",
-                      options: ["All", ...availableStates],
-                    },
-                    {
-                      label: t("salary"),
-                      key: "salary",
-                      options: [
-                        "All",
-                        "Rs 0 - 20000",
-                        "Rs 20000 - 40000",
-                        "Rs 40000+",
-                      ],
-                    },
-                    {
-                      label: t("companies"),
-                      key: "company",
-                      options: ["All", ...availableCompanies],
-                    },
-                  ] as const
-                ).map((filter) => (
-                  <div key={filter.label} className="relative">
-                    <button
-                      onClick={() =>
-                        setActiveFilter(
-                          activeFilter === filter.label ? null : filter.label
-                        )
-                      }
-                      className={`flex items-center gap-1 border-2 border-blue-300 px-3 py-1 rounded-full transition-all duration-200 ${
-                        activeFilter === filter.label
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-white text-gray-800 hover:bg-blue-50"
-                      } focus:outline-none focus:ring-2 focus:ring-blue-400`}
-                    >
-                      <span className="font-medium text-sm">{filter.label}</span>
-                      <ChevronDown size={16} className="text-gray-600" />
-                    </button>
-                    {activeFilter === filter.label && (
-                      <div className="absolute left-0 top-full mt-2 w-40 bg-white shadow-md rounded-lg border border-gray-200 z-70">
-                        {filter.options.map((option) => (
-                          <div
-                            key={option}
-                            className={`px-3 py-1 text-sm cursor-pointer rounded transition-all duration-200 ${
-                              filter.key === "tags"
-                                ? filters.tags.includes(option)
-                                  ? "bg-blue-200 text-blue-900"
-                                  : "hover:bg-gray-100"
-                                : filters[filter.key] === option
-                                ? "bg-blue-200 text-blue-900"
-                                : "hover:bg-gray-100"
-                            }`}
-                            onClick={() => toggleFilterOption(filter.key, option)}
-                          >
-                            {option}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* SEARCH INPUT TAGS AND FILTER TAGS */}
-            <div
-              className="py-3 px-5 bg-white shadow-md rounded-lg flex gap-2 flex-wrap max-h-24 overflow-y-auto notranslate"
-              translate="no"
-            >
-              {searchQuery.query && (
-                <Tag
-                  label={`${t("query")}: ${searchQuery.query}`}
-                  onRemove={() => handleRemoveInput("query")}
-                />
-              )}
-              {searchQuery.location && (
-                <Tag
-                  label={`${t("location")}: ${searchQuery.location}`}
-                  onRemove={() => handleRemoveInput("location")}
-                />
-              )}
-              {searchQuery.experience !== "Experience" && (
-                <Tag
-                  label={`${t("experience")}: ${searchQuery.experience}`}
-                  onRemove={() => handleRemoveInput("experience")}
-                />
-              )}
-              {filters.category !== "All" && (
-                <Tag
-                  label={`${t("category")}: ${filters.category}`}
-                  onRemove={() => handleRemoveFilter("category")}
-                />
-              )}
-              {filters.tags.map((tag) => (
-                <Tag
-                  key={tag}
-                  label={`${t("tag")}: ${tag}`}
-                  onRemove={() => handleRemoveFilter("tags", tag)}
-                />
-              ))}
-              {filters.city !== "All" && (
-                <Tag
-                  label={`${t("city")}: ${filters.city}`}
-                  onRemove={() => handleRemoveFilter("city")}
-                />
-              )}
-              {filters.state !== "All" && (
-                <Tag
-                  label={`${t("state")}: ${filters.state}`}
-                  onRemove={() => handleRemoveFilter("state")}
-                />
-              )}
-              {filters.salary !== "All" && (
-                <Tag
-                  label={`${t("salary")}: ${filters.salary}`}
-                  onRemove={() => handleRemoveFilter("salary")}
-                />
-              )}
-              {filters.company !== "All" && (
-                <Tag
-                  label={`${t("company")}: ${filters.company}`}
-                  onRemove={() => handleRemoveFilter("company")}
-                />
-              )}
-            </div>
-
-            {/* MAIN CONTENT */}
-            <div className="flex h-full">
-              {/* LEFT: JOB LIST */}
-              <div className="w-1/2 border-r-2 border-blue-200 overflow-y-auto p-4 space-y-3 bg-white rounded-l-md shadow-md">
-                {isLoading ? (
-                  <p className="text-center text-blue-700 text-lg font-medium animate-pulse">
-                    {t("loading")}
-                  </p>
-                ) : error ? (
-                  <p className="text-center text-red-700 text-lg font-semibold">
-                    {t("errorMessage")}
-                  </p>
-                ) : !data || (data.categories.length === 0 && data.jobs.length === 0) ? (
-                  <p className="text-center text-gray-500 text-lg italic">
-                    {t("noCategoriesOrJobs")}
-                  </p>
-                ) : data.categories.length === 0 ? (
-                  <p className="text-center text-gray-500 text-lg italic">
-                    {t("noCategories")}
-                  </p>
-                ) : data.jobs.length === 0 ? (
-                  <p className="text-center text-gray-500 text-lg italic">
-                    {t("noJobs")}
-                  </p>
-                ) : filteredJobs.length === 0 ? (
-                  <p className="text-center text-gray-500 text-lg italic">
-                    {t("noMatchingJobs")}
-                  </p>
-                ) : (
-                  filteredJobs.map((job, index) => (
-                    <button
-                      key={`${job.id}-${index}`}
-                      onClick={() => setSelectedJob({ ...job })}
-                      className="w-full text-left"
-                    >
-                      <div
-                        className={`p-3 rounded-md border border-gray-200 bg-white hover:bg-blue-50 transition-all duration-200 cursor-pointer shadow-sm ${
-                          selectedJob?.id === job.id
-                            ? "border-blue-500 bg-blue-100 ring-1 ring-blue-300"
-                            : ""
-                        }`}
-                      >
-                        <h3 className="text-md font-semibold text-blue-800 mb-1">
-                          {job.jobTitle}
-                        </h3>
-                        <p className="text-sm text-gray-700 mb-1">
-                          {job.jobCompany}
-                        </p>
-                        <p className="text-sm text-blue-600 mb-1">{job.salary}</p>
-                        <p className="text-xs text-gray-500">{`${job.city}, ${job.state}`}</p>
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {job.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full hover:bg-blue-200 transition-all duration-200"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatTimeAgo(job.createdAt, t)}
-                        </p>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-
-              {/* RIGHT: JOB DETAILS OR REGISTER */}
-              <div className="w-1/2 overflow-y-auto p-4 bg-white rounded-r-md shadow-md">
-                {selectedJob ? (
-                  user ? (
-                    <div className="space-y-3">
-                      <h2 className="text-xl font-bold text-blue-900">
-                        {selectedJob.jobTitle}
-                      </h2>
-                      <p className="text-md text-gray-700">
-                        {selectedJob.jobCompany}
-                      </p>
-                      <img
-                        src={selectedJob.imageUrl}
-                        alt="Job Cover"
-                        className="rounded-md w-full h-40 object-cover mb-2"
-                        onError={(e) => (e.currentTarget.src = "/placeholder.jpg")}
-                      />
-                      <p className="text-sm text-blue-600">{selectedJob.salary}</p>
-                      <Section
-                        title={t("location")}
-                        content={`${selectedJob.city}, ${selectedJob.state}`}
-                      />
-                      <Section
-                        title={t("address")}
-                        content={selectedJob.address || "Not specified"}
-                      />
-                      <Section
-                        title={t("category")}
-                        content={selectedJob.category}
-                      />
-                      <Section
-                        title={t("contact")}
-                        content={`${selectedJob.contactEmail} | ${selectedJob.contactNumber}`}
-                      />
-                      <Section
-                        title={t("jobDescription")}
-                        content={
-                          selectedJob.jobDescription || "No description available"
-                        }
-                      />
-                      <Section
-                        title={t("preferredSkills")}
-                        content={
-                          <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                            {selectedJob.tags.map((tag, index) => (
-                              <li key={index}>{tag}</li>
-                            ))}
-                          </ul>
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full space-y-4">
-                      <p className="text-center text-blue-700 text-lg font-medium">
-                        {t("signInPrompt")}
-                      </p>
-                      <button
-                        onClick={() => router.push("/signup")}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-200 shadow-md text-lg font-semibold"
-                      >
-                        {t("registerNow")}
-                      </button>
-                    </div>
-                  )
-                ) : (
-                  <p className="text-center text-blue-700 text-lg font-medium">
-                    {t("selectJob")}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </ErrorBoundary>
-      </div>
-    </span>
-  )
+							<div className="fixed inset-0 overflow-y-auto">
+								<div className="flex min-h-full items-center justify-center p-4">
+									<Transition.Child
+										as={Fragment}
+										enter="ease-out duration-300"
+										enterFrom="opacity-0 scale-95"
+										enterTo="opacity-100 scale-100"
+										leave="ease-in duration-200"
+										leaveFrom="opacity-100 scale-100"
+										leaveTo="opacity-0 scale-95"
+									>
+										<Dialog.Panel className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+											<Dialog.Title
+												as="h3"
+												className="text-xl font-bold text-gray-900 mb-4"
+											>
+												{selectedCard?.title}
+											</Dialog.Title>
+											<div className="relative w-full h-64">
+												<img
+													src={selectedCard?.image}
+													alt={selectedCard?.title}
+													className="absolute inset-0 w-full h-full object-cover"
+												/>
+											</div>
+											<p className="text-sm text-gray-600 mt-4">
+												{selectedCard?.description}
+											</p>
+											<div className="flex justify-end mt-4">
+												<button
+													onClick={() => setSelectedCard(null)}
+													className="px-6 py-2 text-lg font-semibold bg-blue-600 text-white rounded-full hover:bg-blue-700 transition duration-200"
+												>
+													{t("close")}
+												</button>
+											</div>
+										</Dialog.Panel>
+									</Transition.Child>
+								</div>
+							</div>
+						</Dialog>
+					</Transition>
+				</div>
+			</div>
+		</span>
+	)
 }
