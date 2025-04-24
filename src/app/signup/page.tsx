@@ -1,6 +1,6 @@
 "use client"
 
-import { User, Mail, Lock, Phone, UserPlus } from "lucide-react"
+import { User, Mail, Lock, Phone, UserPlus, File } from "lucide-react"
 import { useState, FormEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -186,7 +186,7 @@ export default function UserManagementPage() {
 
 					<div>
 						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
-							<User className="w-4 h-4" /> Profile Image
+							<File className="w-4 h-4" /> Upload Resume
 						</label>
 						<input
 							type="file"
