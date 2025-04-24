@@ -1,7 +1,7 @@
 "use client"
 
 import { User, Mail, Lock, Phone, UserPlus } from "lucide-react"
-import { useState, FormEvent } from "react"
+import { useState, FormEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { auth, db } from "../lib/firebase"
@@ -11,16 +11,33 @@ import {
 	signInWithPopup,
 } from "firebase/auth"
 import { addDoc, collection } from "firebase/firestore"
+import {
+	getStorage,
+	ref,
+	uploadBytes,
+	getDownloadURL,
+} from "firebase/storage"
 import toast from "react-hot-toast"
+
+// Initialize Firebase Storage
+const storage = getStorage()
 
 export default function UserManagementPage() {
 	const [name, setName] = useState<string>("")
 	const [email, setEmail] = useState<string>("")
 	const [phoneNumber, setPhoneNumber] = useState<string>("")
 	const [password, setPassword] = useState<string>("")
+	const [image, setImage] = useState<File | null>(null)
 	const [loading, setLoading] = useState<boolean>(false)
 	const [error, setError] = useState<string | null>(null)
 	const router = useRouter()
+
+	// Handle image file selection
+	const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+		if (e.target.files && e.target.files[0]) {
+			setImage(e.target.files[0])
+		}
+	}
 
 	const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
@@ -30,6 +47,7 @@ export default function UserManagementPage() {
 		try {
 			if (!name || !email || !phoneNumber || !password) {
 				setError("All fields are required.")
+				setLoading(false)
 				return
 			}
 
@@ -41,12 +59,24 @@ export default function UserManagementPage() {
 			)
 			const user = userCredential.user
 
-			// Store additional user info in Firestore
+			let fileUrl = ""
+			// Upload image to Firebase Storage if an image is selected
+			if (image) {
+				const imageRef = ref(
+					storage,
+					`user-files/${user.uid}/profile-image`
+				) // Changed from users/ to user-files/
+				await uploadBytes(imageRef, image)
+				fileUrl = await getDownloadURL(imageRef)
+			}
+
+			// Store user info in Firestore, including file URL
 			await addDoc(collection(db, "users"), {
 				uid: user.uid,
 				name,
 				email,
 				phoneNumber,
+				fileUrl,
 				createdAt: new Date().toISOString(),
 			})
 
@@ -55,6 +85,7 @@ export default function UserManagementPage() {
 			setEmail("")
 			setPhoneNumber("")
 			setPassword("")
+			setImage(null)
 			router.push("/")
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err)
@@ -79,7 +110,8 @@ export default function UserManagementPage() {
 				uid: user.uid,
 				name: user.displayName || "Google User",
 				email: user.email || "",
-				phoneNumber: user.phoneNumber || "", // Google may not provide phone number
+				phoneNumber: user.phoneNumber || "",
+				fileUrl: user.photoURL || "",
 				createdAt: new Date().toISOString(),
 			})
 
@@ -149,6 +181,18 @@ export default function UserManagementPage() {
 							onChange={(e) => setPhoneNumber(e.target.value)}
 							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 							placeholder="+1234567890"
+						/>
+					</div>
+
+					<div>
+						<label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
+							<User className="w-4 h-4" /> Profile Image
+						</label>
+						<input
+							type="file"
+							accept="image/*"
+							onChange={handleImageChange}
+							className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
 						/>
 					</div>
 

@@ -112,7 +112,7 @@ export default function Information() {
 
 	return (
 		<span>
-			<div className="py-8 mt-18 px-4 bg-gradient-to-b from-gray-50 to-white">
+			<div className="py-8 mt-16 px-4 bg-gradient-to-b from-gray-50 to-white">
 				<div className="max-w-7xl mx-auto">
 					<h1 className="text-4xl font-extrabold text-center text-blue-900 mb-8">
 						{t("News")}
