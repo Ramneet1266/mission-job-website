@@ -119,7 +119,7 @@ export default function Navbar() {
 						href="/"
 						className="text-2xl md:text-3xl font-bold text-blue-700"
 					>
-						Mission<span className="text-blue-400">●</span>Job
+						Mission<span className="text-blue-900"></span>Job
 					</Link>
 
 					<div className="hidden md:flex space-x-5 font-medium text-sm text-black">
