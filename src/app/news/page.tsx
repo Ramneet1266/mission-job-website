@@ -132,7 +132,7 @@ export default function Information() {
 										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 								}`}
 							>
-								{t("latest")}
+								{t("Latest")}
 							</button>
 							<button
 								onClick={() => {
@@ -145,7 +145,7 @@ export default function Information() {
 										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 								}`}
 							>
-								{t("oldest")}
+								{t("Oldest")}
 							</button>
 							<button
 								onClick={() => {
@@ -158,13 +158,13 @@ export default function Information() {
 										: "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
 								}`}
 							>
-								{t("mostSearched")}
+								{t("Most Searched")}
 							</button>
 						</div>
 
 						<input
 							type="text"
-							placeholder={t("searchPlaceholder")}
+							placeholder={t("Search...")}
 							value={search}
 							onChange={(e) => {
 								setSearch(e.target.value)

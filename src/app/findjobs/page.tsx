@@ -503,7 +503,7 @@ export default function JobFilterBar() {
 								{(
 									[
 										{
-											label: t("categories"),
+											label: t("Categories"),
 											key: "category",
 											options: [
 												"All",
@@ -511,22 +511,22 @@ export default function JobFilterBar() {
 											],
 										},
 										{
-											label: t("tags"),
+											label: t("Tags"),
 											key: "tags",
 											options: availableTags,
 										},
 										{
-											label: t("cities"),
+											label: t("Cities"),
 											key: "city",
 											options: ["All", ...availableCities],
 										},
 										{
-											label: t("states"),
+											label: t("States"),
 											key: "state",
 											options: ["All", ...availableStates],
 										},
 										{
-											label: t("salary"),
+											label: t("Salary"),
 											key: "salary",
 											options: [
 												"All",
@@ -536,7 +536,7 @@ export default function JobFilterBar() {
 											],
 										},
 										{
-											label: t("companies"),
+											label: t("Companies"),
 											key: "company",
 											options: ["All", ...availableCompanies],
 										},
@@ -566,7 +566,7 @@ export default function JobFilterBar() {
 											/>
 										</button>
 										{activeFilter === filter.label && (
-											<div className="absolute left-0 top-full mt-2 w-40 bg-white shadow-md rounded-lg border border-gray-200 z-70">
+											<div className="absolute left-0 top-full mt-2 w-40 max-h-48 overflow-y-auto bg-white shadow-md rounded-lg border border-gray-200 z-70">
 												{filter.options.map((option) => (
 													<div
 														key={option}
@@ -658,7 +658,8 @@ export default function JobFilterBar() {
 						</div>
 
 						{/* MAIN CONTENT */}
-						<div className="flex h-full">
+						{/* MAIN CONTENT */}
+						<div className="flex h-[calc(100vh-4rem)] mt-4">
 							{/* LEFT: JOB LIST */}
 							<div className="w-1/2 border-r-2 border-blue-200 overflow-y-auto p-4 space-y-3 bg-white rounded-l-md shadow-md">
 								{isLoading ? (
@@ -791,13 +792,13 @@ export default function JobFilterBar() {
 									) : (
 										<div className="flex flex-col items-center justify-center h-full space-y-4">
 											<p className="text-center text-blue-700 text-lg font-medium">
-												{t("signInPrompt")}
+												{t("Please Sign In To See Full Description")}
 											</p>
 											<button
 												onClick={() => router.push("/signup")}
 												className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-200 shadow-md text-lg font-semibold"
 											>
-												{t("registerNow")}
+												{t("Register Now")}
 											</button>
 										</div>
 									)
