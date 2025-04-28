@@ -66,79 +66,94 @@ interface Job {
 	postalCode: string
 }
 
-const formatTimeAgo = (
-	createdAt: string,
-	t: TFunction<"translation", undefined>
-) => {
-	const now = new Date()
-	const posted = new Date(createdAt)
-	const diffMs = now.getTime() - posted.getTime()
-	const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-	if (diffHours < 24) return t("postedHoursAgo", { hours: diffHours })
-	const diffDays = Math.floor(diffHours / 24)
-	return t("postedDaysAgo", { days: diffDays })
+// Define the return type for fetchJobsAndCategories
+interface JobsAndCategories {
+	categories: Category[]
+	jobs: Job[]
+	cities: string[]
+	states: string[]
+	companies: string[]
+	tags: string[]
 }
 
-// Fetcher function for SWR
-const fetchJobsAndCategories = async () => {
-	const categoriesSnapshot = await getDocs(
-		collection(db, "categories")
-	)
-	const categoriesData: Category[] = categoriesSnapshot.docs.map(
-		(doc) => ({
-			id: doc.id,
-			title: doc.data().title || "Untitled",
+// New function to format Firestore date
+const formatJobDate = (createdAt: string) => {
+	try {
+		const date = new Date(createdAt)
+		return date.toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
 		})
-	)
+	} catch (error) {
+		console.error("Error formatting date:", error)
+		return "Unknown Date"
+	}
+}
 
-	const allJobs: Job[] = []
-	const citiesSet = new Set<string>()
-	const statesSet = new Set<string>()
-	const companiesSet = new Set<string>()
-	const tagsSet = new Set<string>()
-
-	for (const category of categoriesSnapshot.docs) {
-		const postingsSnapshot = await getDocs(
-			collection(db, "categories", category.id, "posting")
+// Fetcher function for SWR with explicit return type
+const fetchJobsAndCategories =
+	async (): Promise<JobsAndCategories> => {
+		const categoriesSnapshot = await getDocs(
+			collection(db, "categories")
 		)
-		postingsSnapshot.docs.forEach((doc) => {
-			const data = doc.data()
-			allJobs.push({
+		const categoriesData: Category[] = categoriesSnapshot.docs.map(
+			(doc) => ({
 				id: doc.id,
-				jobTitle: data.jobTitle || "Untitled Job",
-				jobCompany: data.jobCompany || "Unknown Company",
-				city: data.city || "",
-				state: data.state || "",
-				salary: data.salary || "Not specified",
-				tags: data.tags || [],
-				createdAt: data.createdAt || new Date().toISOString(),
-				imageUrl: data.imageUrl || "/placeholder.jpg",
-				jobDescription:
-					data.jobDescription || "No description available",
-				address: data.address || "",
-				category: data.category || "Uncategorized",
-				contactEmail: data.contactEmail || "",
-				contactNumber: data.contactNumber || "",
-				postalCode: data.postalCode || "",
+				title: doc.data().title || "Untitled",
 			})
-			if (data.city) citiesSet.add(data.city)
-			if (data.state) statesSet.add(data.state)
-			if (data.jobCompany) companiesSet.add(data.jobCompany)
-			if (data.tags && Array.isArray(data.tags)) {
-				data.tags.forEach((tag: string) => tagsSet.add(tag))
-			}
-		})
-	}
+		)
 
-	return {
-		categories: categoriesData,
-		jobs: allJobs,
-		cities: Array.from(citiesSet),
-		states: Array.from(statesSet),
-		companies: Array.from(companiesSet),
-		tags: Array.from(tagsSet),
+		const allJobs: Job[] = []
+		const citiesSet = new Set<string>()
+		const statesSet = new Set<string>()
+		const companiesSet = new Set<string>()
+		const tagsSet = new Set<string>()
+
+		for (const category of categoriesSnapshot.docs) {
+			const postingsSnapshot = await getDocs(
+				collection(db, "categories", category.id, "posting")
+			)
+			postingsSnapshot.docs.forEach((doc) => {
+				const data = doc.data()
+				allJobs.push({
+					id: doc.id,
+					jobTitle: data.jobTitle || "Untitled Job",
+					jobCompany: data.jobCompany || "Unknown Company",
+					city: data.city || "",
+					state: data.state || "",
+					salary: data.salary || "Not specified",
+					tags: data.tags || [],
+					createdAt:
+						data.createdAt?.toDate?.().toISOString() ||
+						new Date().toISOString(),
+					imageUrl: data.imageUrl || "/placeholder.jpg",
+					jobDescription:
+						data.jobDescription || "No description available",
+					address: data.address || "",
+					category: data.category || "Uncategorized",
+					contactEmail: data.contactEmail || "",
+					contactNumber: data.contactNumber || "",
+					postalCode: data.postalCode || "",
+				})
+				if (data.city) citiesSet.add(data.city)
+				if (data.state) statesSet.add(data.state)
+				if (data.jobCompany) companiesSet.add(data.jobCompany)
+				if (data.tags && Array.isArray(data.tags)) {
+					data.tags.forEach((tag: string) => tagsSet.add(tag))
+				}
+			})
+		}
+
+		return {
+			categories: categoriesData,
+			jobs: allJobs,
+			cities: Array.from(citiesSet),
+			states: Array.from(statesSet),
+			companies: Array.from(companiesSet),
+			tags: Array.from(tagsSet),
+		}
 	}
-}
 
 export default function JobFilterBar() {
 	const { t } = useTranslation()
@@ -172,9 +187,12 @@ export default function JobFilterBar() {
 		string[]
 	>([])
 	const [user, setUser] = useState<User | null>(null)
+	const [sortOrder, setSortOrder] = useState<
+		"default" | "latest" | "oldest"
+	>("default")
 
-	// Use SWR to fetch and cache data
-	const { data, error, isLoading } = useSWR(
+	// Use SWR with explicit type
+	const { data, error, isLoading } = useSWR<JobsAndCategories>(
 		"jobsAndCategories",
 		fetchJobsAndCategories,
 		{
@@ -340,63 +358,93 @@ export default function JobFilterBar() {
 		experience: searchParams?.get("experience") || "Experience",
 	}
 
-	const filteredJobs = jobs.filter((job) => {
-		const matchesCategory =
-			filters.category === "All" || job.category === filters.category
-		const matchesTags =
-			filters.tags.length === 0 ||
-			filters.tags.every((tag) => job.tags.includes(tag))
-		const matchesCity =
-			filters.city === "All" || job.city === filters.city
-		const matchesState =
-			filters.state === "All" || job.state === filters.state
-		const matchesSalary =
-			filters.salary === "All" ||
-			(filters.salary === "Rs 0 - 20000"
-				? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
+	const filteredJobs = jobs
+		.filter((job) => {
+			const matchesCategory =
+				filters.category === "All" ||
+				job.category === filters.category
+			const matchesTags =
+				filters.tags.length === 0 ||
+				filters.tags.every((tag) => job.tags.includes(tag))
+			const matchesCity =
+				filters.city === "All" || job.city === filters.city
+			const matchesState =
+				filters.state === "All" || job.state === filters.state
+			const matchesSalary =
+				filters.salary === "All" ||
+				(filters.salary === "Rs 0 - 20000"
+					? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
+						? false
+						: parseInt(job.salary.replace("Rs ", "")) <= 20000
+					: filters.salary === "Rs 20000 - 40000"
+					? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
+						? false
+						: parseInt(job.salary.replace("Rs ", "")) > 20000 &&
+						  parseInt(job.salary.replace("Rs ", "")) <= 40000
+					: Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
 					? false
-					: parseInt(job.salary.replace("Rs ", "")) <= 20000
-				: filters.salary === "Rs 20000 - 40000"
-				? Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
-					? false
-					: parseInt(job.salary.replace("Rs ", "")) > 20000 &&
-					  parseInt(job.salary.replace("Rs ", "")) <= 40000
-				: Number.isNaN(parseInt(job.salary.replace("Rs ", "")))
-				? false
-				: parseInt(job.salary.replace("Rs ", "")) > 40000)
-		const matchesCompany =
-			filters.company === "All" || job.jobCompany === filters.company
+					: parseInt(job.salary.replace("Rs ", "")) > 40000)
+			const matchesCompany =
+				filters.company === "All" ||
+				job.jobCompany === filters.company
 
-		const query = searchQuery.query.toLowerCase().trim()
-		const matchesQuery =
-			query === "" ||
-			job.category.toLowerCase() === query ||
-			job.tags.some((tag) => tag.toLowerCase() === query) ||
-			job.jobTitle.toLowerCase().split(" ").includes(query)
+			const query = searchQuery.query.toLowerCase().trim()
+			const matchesQuery =
+				query === "" ||
+				job.category.toLowerCase() === query ||
+				job.tags.some((tag) => tag.toLowerCase() === query) ||
+				job.jobTitle.toLowerCase().split(" ").includes(query)
 
-		const location = searchQuery.location.toLowerCase().trim()
-		const matchesLocation =
-			location === "" ||
-			job.city.toLowerCase().includes(location) ||
-			job.state.toLowerCase().includes(location)
+			const location = searchQuery.location.toLowerCase().trim()
+			const matchesLocation =
+				location === "" ||
+				job.city.toLowerCase().includes(location) ||
+				job.state.toLowerCase().includes(location)
 
-		const experience = searchQuery.experience.toLowerCase().trim()
-		const matchesExperience =
-			experience === "experience" ||
-			job.tags.some((tag) => tag.toLowerCase().includes(experience))
+			const experience = searchQuery.experience.toLowerCase().trim()
+			const matchesExperience =
+				experience === "experience" ||
+				job.tags.some((tag) => tag.toLowerCase().includes(experience))
 
-		return (
-			matchesCategory &&
-			matchesTags &&
-			matchesCity &&
-			matchesState &&
-			matchesSalary &&
-			matchesCompany &&
-			matchesQuery &&
-			matchesLocation &&
-			matchesExperience
-		)
-	})
+			return (
+				matchesCategory &&
+				matchesTags &&
+				matchesCity &&
+				matchesState &&
+				matchesSalary &&
+				matchesCompany &&
+				matchesQuery &&
+				matchesLocation &&
+				matchesExperience
+			)
+		})
+		.sort((a, b) => {
+			// Handle invalid or missing dates
+			const getDate = (createdAt: string | any): number => {
+				if (!createdAt) return 0 // Fallback for missing dates
+				if (typeof createdAt === "string") {
+					const date = new Date(createdAt)
+					return isNaN(date.getTime()) ? 0 : date.getTime()
+				}
+				if (createdAt?.toDate) {
+					// Handle Firestore Timestamp
+					return createdAt.toDate().getTime()
+				}
+				return 0 // Fallback for unexpected formats
+			}
+
+			const dateA = getDate(a.createdAt)
+			const dateB = getDate(b.createdAt)
+
+			if (sortOrder === "latest") {
+				return dateB - dateA // Newest first
+			} else if (sortOrder === "oldest") {
+				return dateA - dateB // Oldest first
+			} else {
+				// Default: Sort by latest
+				return dateB - dateA
+			}
+		})
 
 	// Auto-select first job only if no job is selected or selected job is invalid
 	useEffect(() => {
@@ -494,11 +542,40 @@ export default function JobFilterBar() {
 							{t("Find Jobs")}
 						</h1>
 
-						{/* FILTER BAR */}
+						{/* FILTER BAR AND SORTING */}
 						<div
-							className="border-b-2 border-blue-200 py-4 flex justify-center bg-white shadow-sm sticky top-24 z-60 rounded-b-md notranslate"
+							className="border-b-2 border-blue-200 py-4 bg-white shadow-sm sticky top-24 z-60 rounded-b-md flex items-center justify-between px-6"
 							translate="no"
 						>
+							{/* SORTING BUTTONS */}
+							<div className="flex gap-2">
+								{[
+									{ label: t("Default"), value: "default" },
+									{ label: t("Latest"), value: "latest" },
+									{ label: t("Oldest"), value: "oldest" },
+								].map((sortOption) => (
+									<button
+										key={sortOption.value}
+										onClick={() =>
+											setSortOrder(
+												sortOption.value as
+													| "default"
+													| "latest"
+													| "oldest"
+											)
+										}
+										className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 shadow-sm ${
+											sortOrder === sortOption.value
+												? "bg-blue-600 text-white"
+												: "bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-800"
+										} focus:outline-none focus:ring-2 focus:ring-blue-400`}
+									>
+										{sortOption.label}
+									</button>
+								))}
+							</div>
+
+							{/* FILTER DROPDOWNS */}
 							<div className="flex gap-2 flex-wrap justify-center">
 								{(
 									[
@@ -658,7 +735,6 @@ export default function JobFilterBar() {
 						</div>
 
 						{/* MAIN CONTENT */}
-						{/* MAIN CONTENT */}
 						<div className="flex h-[calc(100vh-4rem)] mt-4">
 							{/* LEFT: JOB LIST */}
 							<div className="w-1/2 border-r-2 border-blue-200 overflow-y-auto p-4 space-y-3 bg-white rounded-l-md shadow-md">
@@ -723,7 +799,7 @@ export default function JobFilterBar() {
 													))}
 												</div>
 												<p className="text-xs text-gray-500 mt-1">
-													{formatTimeAgo(job.createdAt, t)}
+													{formatJobDate(job.createdAt)}
 												</p>
 											</div>
 										</button>
