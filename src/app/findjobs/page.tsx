@@ -7,7 +7,9 @@ import React, {
 	ReactNode,
 } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { ChevronDown, X, ArrowLeft } from "lucide-react"
+import { ChevronDown, X, ArrowLeft, Download } from "lucide-react"
+// Optional: If you want to use ExternalLink icon instead of Download
+// import { ChevronDown, X, ArrowLeft, ExternalLink } from "lucide-react"
 import {
 	db,
 	collection,
@@ -66,7 +68,6 @@ interface Job {
 	postalCode: string
 }
 
-// Define the return type for fetchJobsAndCategories
 interface JobsAndCategories {
 	categories: Category[]
 	jobs: Job[]
@@ -76,7 +77,6 @@ interface JobsAndCategories {
 	tags: string[]
 }
 
-// New function to format Firestore date
 const formatJobDate = (createdAt: string) => {
 	try {
 		const date = new Date(createdAt)
@@ -91,7 +91,6 @@ const formatJobDate = (createdAt: string) => {
 	}
 }
 
-// Fetcher function for SWR with explicit return type
 const fetchJobsAndCategories =
 	async (): Promise<JobsAndCategories> => {
 		const categoriesSnapshot = await getDocs(
@@ -118,20 +117,19 @@ const fetchJobsAndCategories =
 				const data = doc.data()
 				allJobs.push({
 					id: doc.id,
-					jobTitle: data.jobTitle || "Untitled Job",
-					jobCompany: data.jobCompany || "Unknown Company",
+					jobTitle: data.jobTitle || "Title Not Specified",
+					jobCompany: data.jobCompany || "",
 					city: data.city || "",
 					state: data.state || "",
-					salary: data.salary || "Not specified",
+					salary: data.salary || "",
 					tags: data.tags || [],
 					createdAt:
 						data.createdAt?.toDate?.().toISOString() ||
 						new Date().toISOString(),
-					imageUrl: data.imageUrl || "/placeholder.jpg",
-					jobDescription:
-						data.jobDescription || "No description available",
+					imageUrl: data.imageUrl || "",
+					jobDescription: data.jobDescription || "",
 					address: data.address || "",
-					category: data.category || "Uncategorized",
+					category: data.category || "",
 					contactEmail: data.contactEmail || "",
 					contactNumber: data.contactNumber || "",
 					postalCode: data.postalCode || "",
@@ -191,7 +189,6 @@ export default function JobFilterBar() {
 		"default" | "latest" | "oldest"
 	>("default")
 
-	// Use SWR with explicit type
 	const { data, error, isLoading } = useSWR<JobsAndCategories>(
 		"jobsAndCategories",
 		fetchJobsAndCategories,
@@ -201,7 +198,6 @@ export default function JobFilterBar() {
 		}
 	)
 
-	// Update state with SWR data
 	useEffect(() => {
 		if (data) {
 			setCategories(data.categories || [])
@@ -222,7 +218,6 @@ export default function JobFilterBar() {
 		}
 	}, [data, searchParams])
 
-	// Clean up Google Translate hash
 	useEffect(() => {
 		if (window.location.hash.includes("googtrans")) {
 			router.replace(`/findjobs?${searchParams?.toString() || ""}`, {
@@ -232,7 +227,6 @@ export default function JobFilterBar() {
 		}
 	}, [router, searchParams])
 
-	// Initialize filters from URL parameters with validation
 	useEffect(() => {
 		const category = searchParams?.get("category") || "All"
 		const city = searchParams?.get("city") || "All"
@@ -260,7 +254,6 @@ export default function JobFilterBar() {
 		}))
 	}, [searchParams])
 
-	// Check auth state
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
 			console.log(
@@ -272,7 +265,6 @@ export default function JobFilterBar() {
 		return () => unsubscribe()
 	}, [])
 
-	// Handle removing a search input
 	const handleRemoveInput = (key: keyof typeof searchQuery) => {
 		const newParams = new URLSearchParams(
 			searchParams?.toString() || ""
@@ -283,7 +275,6 @@ export default function JobFilterBar() {
 		})
 	}
 
-	// Handle removing a filter
 	const handleRemoveFilter = (
 		key: keyof typeof filters,
 		value?: string
@@ -322,12 +313,10 @@ export default function JobFilterBar() {
 		}
 	}
 
-	// Navigate to homepage
 	const handleBackToHome = () => {
 		router.push("/")
 	}
 
-	// Update tags when category changes
 	useEffect(() => {
 		const filteredJobs =
 			filters.category === "All"
@@ -351,7 +340,6 @@ export default function JobFilterBar() {
 		}))
 	}, [filters.category, jobs, searchParams])
 
-	// Filter jobs, including searchQuery from URL
 	const searchQuery = {
 		query: searchParams?.get("query") || "",
 		location: searchParams?.get("location") || "",
@@ -419,34 +407,30 @@ export default function JobFilterBar() {
 			)
 		})
 		.sort((a, b) => {
-			// Handle invalid or missing dates
 			const getDate = (createdAt: string | any): number => {
-				if (!createdAt) return 0 // Fallback for missing dates
+				if (!createdAt) return 0
 				if (typeof createdAt === "string") {
 					const date = new Date(createdAt)
 					return isNaN(date.getTime()) ? 0 : date.getTime()
 				}
 				if (createdAt?.toDate) {
-					// Handle Firestore Timestamp
 					return createdAt.toDate().getTime()
 				}
-				return 0 // Fallback for unexpected formats
+				return 0
 			}
 
 			const dateA = getDate(a.createdAt)
 			const dateB = getDate(b.createdAt)
 
 			if (sortOrder === "latest") {
-				return dateB - dateA // Newest first
+				return dateB - dateA
 			} else if (sortOrder === "oldest") {
-				return dateA - dateB // Oldest first
+				return dateA - dateB
 			} else {
-				// Default: Sort by latest
 				return dateB - dateA
 			}
 		})
 
-	// Auto-select first job only if no job is selected or selected job is invalid
 	useEffect(() => {
 		if (!filteredJobs.length) {
 			setSelectedJob(null)
@@ -500,6 +484,10 @@ export default function JobFilterBar() {
 		setActiveFilter(null)
 	}
 
+	const handleDownloadImage = (imageUrl: string) => {
+		window.open(imageUrl, "_blank")
+	}
+
 	const Tag = ({
 		label,
 		onRemove,
@@ -526,7 +514,7 @@ export default function JobFilterBar() {
 		content: React.ReactNode
 	}) => (
 		<div className="mb-4">
-			<h3 className="text-lg font-semibold text-blue-900 mb-1">
+			<h3 className="text-1g font-semibold text-blue-900 mb-1">
 				{title}
 			</h3>
 			<div className="text-gray-700">{content}</div>
@@ -542,12 +530,10 @@ export default function JobFilterBar() {
 							{t("Find Jobs")}
 						</h1>
 
-						{/* FILTER BAR AND SORTING */}
 						<div
 							className="border-b-2 border-blue-200 py-4 bg-white shadow-sm sticky top-24 z-60 rounded-b-md flex items-center justify-between px-6"
 							translate="no"
 						>
-							{/* SORTING BUTTONS */}
 							<div className="flex gap-2">
 								{[
 									{ label: t("Default"), value: "default" },
@@ -575,7 +561,6 @@ export default function JobFilterBar() {
 								))}
 							</div>
 
-							{/* FILTER DROPDOWNS */}
 							<div className="flex gap-2 flex-wrap justify-center">
 								{(
 									[
@@ -670,7 +655,6 @@ export default function JobFilterBar() {
 							</div>
 						</div>
 
-						{/* SEARCH INPUT TAGS AND FILTER TAGS */}
 						<div
 							className="py-3 px-5 bg-white shadow-md rounded-lg flex gap-2 flex-wrap max-h-24 overflow-y-auto notranslate"
 							translate="no"
@@ -734,13 +718,11 @@ export default function JobFilterBar() {
 							)}
 						</div>
 
-						{/* MAIN CONTENT */}
 						<div className="flex h-[calc(100vh-4rem)] mt-4">
-							{/* LEFT: JOB LIST */}
 							<div className="w-1/2 border-r-2 border-blue-200 overflow-y-auto p-4 space-y-3 bg-white rounded-l-md shadow-md">
 								{isLoading ? (
 									<p className="text-center text-blue-700 text-lg font-medium animate-pulse">
-										{t("loading")}
+										{t("Loading")}
 									</p>
 								) : error ? (
 									<p className="text-center text-red-700 text-lg font-semibold">
@@ -772,99 +754,177 @@ export default function JobFilterBar() {
 											className="w-full text-left"
 										>
 											<div
-												className={`p-3 rounded-md border border-gray-200 bg-white hover:bg-blue-50 transition-all duration-200 cursor-pointer shadow-sm ${
+												className={`p-3 rounded-md border border-gray-200 bg-white hover:bg-blue-50 transition-all duration-200 cursor-pointer shadow-sm relative ${
 													selectedJob?.id === job.id
 														? "border-blue-500 bg-blue-100 ring-1 ring-blue-300"
 														: ""
 												}`}
 											>
-												<h3 className="text-md font-semibold text-blue-800 mb-1">
+												<h3 className="text-md font-semibold text-blue-800 mb-1 relative z-10">
 													{job.jobTitle}
 												</h3>
-												<p className="text-sm text-gray-700 mb-1">
-													{job.jobCompany}
-												</p>
-												<p className="text-sm text-blue-600 mb-1">
-													{job.salary}
-												</p>
-												<p className="text-xs text-gray-500">{`${job.city}, ${job.state}`}</p>
-												<div className="flex gap-1 mt-1 flex-wrap">
-													{job.tags.map((tag) => (
-														<span
-															key={tag}
-															className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full hover:bg-blue-200 transition-all duration-200"
-														>
-															{tag}
-														</span>
-													))}
+												<div className="relative">
+													<div className="space-y-1">
+														<p className="text-sm text-gray-700 mb-1">
+															{job.jobCompany}
+														</p>
+														<p className="text-sm text-blue-600 mb-1">
+															{job.salary}
+														</p>
+														<p className="text-xs text-gray-500">{`${job.city}, ${job.state}`}</p>
+														<div className="flex gap-1 mt-1 flex-wrap">
+															{job.tags.map((tag) => (
+																<span
+																	key={tag}
+																	className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full hover:bg-blue-200 transition-all duration-200"
+																>
+																	{tag}
+																</span>
+															))}
+														</div>
+														<p className="text-xs text-gray-500 mt-1">
+															{formatJobDate(job.createdAt)}
+														</p>
+													</div>
+													{!user && (
+														<div className="absolute inset-0 bg-white bg-opacity-70 rounded-md flex items-center justify-center z-10">
+															<button
+																onClick={() => router.push("/signup")}
+																className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-200 shadow-md text-sm font-semibold"
+															>
+																{t("Register Now To See Description")}
+															</button>
+														</div>
+													)}
 												</div>
-												<p className="text-xs text-gray-500 mt-1">
-													{formatJobDate(job.createdAt)}
-												</p>
 											</div>
 										</button>
 									))
 								)}
 							</div>
 
-							{/* RIGHT: JOB DETAILS OR REGISTER */}
 							<div className="w-1/2 overflow-y-auto p-4 bg-white rounded-r-md shadow-md">
 								{selectedJob ? (
 									user ? (
-										<div className="space-y-3">
-											<h2 className="text-xl font-bold text-blue-900">
-												{selectedJob.jobTitle}
-											</h2>
-											<p className="text-md text-gray-700">
-												{selectedJob.jobCompany}
-											</p>
-											<img
-												src={selectedJob.imageUrl}
-												alt="Job Cover"
-												className="rounded-md w-full h-40 object-cover mb-2"
-												onError={(e) =>
-													(e.currentTarget.src = "/placeholder.jpg")
-												}
-											/>
-											<p className="text-sm text-blue-600">
-												{selectedJob.salary}
-											</p>
-											<Section
-												title={t("location")}
-												content={`${selectedJob.city}, ${selectedJob.state}`}
-											/>
-											<Section
-												title={t("address")}
-												content={
-													selectedJob.address || t("notSpecified")
-												}
-											/>
-											<Section
-												title={t("category")}
-												content={selectedJob.category}
-											/>
-											<Section
-												title={t("contact")}
-												content={`${selectedJob.contactEmail} | ${selectedJob.contactNumber}`}
-											/>
-											<Section
-												title={t("jobDescription")}
-												content={
-													selectedJob.jobDescription ||
-													t("noDescription")
-												}
-											/>
-											<Section
-												title={t("preferredSkills")}
-												content={
-													<ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-														{selectedJob.tags.map((tag, index) => (
-															<li key={index}>{tag}</li>
-														))}
-													</ul>
-												}
-											/>
-										</div>
+										(() => {
+											const fields = {
+												jobTitle: selectedJob.jobTitle,
+												jobCompany: selectedJob.jobCompany,
+												salary: selectedJob.salary,
+												location: `${selectedJob.city}, ${selectedJob.state}`,
+												address: selectedJob.address,
+												category: selectedJob.category,
+												contact: `${selectedJob.contactEmail} | ${selectedJob.contactNumber}`,
+												jobDescription: selectedJob.jobDescription,
+												tags:
+													selectedJob.tags.length > 0
+														? selectedJob.tags
+														: null,
+											}
+
+											const allFieldsEmptyExceptImage =
+												!Object.values(fields).some(
+													(field) =>
+														field &&
+														(!Array.isArray(field) ||
+															field.length > 0)
+												)
+
+											return (
+												<div className="space-y-3">
+													{fields.jobTitle && (
+														<h2 className="text-xl font-bold text-blue-900">
+															{fields.jobTitle}
+														</h2>
+													)}
+													{fields.jobCompany && (
+														<p className="text-md text-gray-700">
+															{fields.jobCompany}
+														</p>
+													)}
+													{selectedJob.imageUrl && (
+														<div className="relative">
+															<img
+																src={selectedJob.imageUrl}
+																alt="Job Cover"
+																className={`rounded-md h-auto w-full object-cover mb-2 ${
+																	allFieldsEmptyExceptImage
+																		? "h-full"
+																		: "h-40"
+																}`}
+															/>
+															<button
+																onClick={() =>
+																	handleDownloadImage(
+																		selectedJob.imageUrl
+																	)
+																}
+																className="absolute top-2 right-2 p-2 cursor-pointer bg-white rounded-full shadow-md hover:bg-gray-100 transition-all duration-200 hover:opacity-80"
+																title={t("Open Image")} // Updated title
+															>
+																<Download
+																	size={20}
+																	className="text-blue-600"
+																/>
+																{/* Optional: Use ExternalLink icon instead */}
+																{/* <ExternalLink size={20} className="text-blue-600" /> */}
+															</button>
+														</div>
+													)}
+													{fields.salary && (
+														<p className="text-sm text-blue-600">
+															{fields.salary}
+														</p>
+													)}
+													{fields.location &&
+														fields.location !== ", " && (
+															<Section
+																title={t("location")}
+																content={fields.location}
+															/>
+														)}
+													{fields.address && (
+														<Section
+															title={t("address")}
+															content={fields.address}
+														/>
+													)}
+													{fields.category && (
+														<Section
+															title={t("category")}
+															content={fields.category}
+														/>
+													)}
+													{fields.contact &&
+														fields.contact !== " | " && (
+															<Section
+																title={t("contact")}
+																content={fields.contact}
+															/>
+														)}
+													{fields.jobDescription && (
+														<Section
+															title={t("jobDescription")}
+															content={fields.jobDescription}
+														/>
+													)}
+													{fields.tags && (
+														<Section
+															title={t("preferredSkills")}
+															content={
+																<ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+																	{selectedJob.tags.map(
+																		(tag, index) => (
+																			<li key={index}>{tag}</li>
+																		)
+																	)}
+																</ul>
+															}
+														/>
+													)}
+												</div>
+											)
+										})()
 									) : (
 										<div className="flex flex-col items-center justify-center h-full space-y-4">
 											<p className="text-center text-blue-700 text-lg font-medium">
@@ -874,13 +934,13 @@ export default function JobFilterBar() {
 												onClick={() => router.push("/signup")}
 												className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-200 shadow-md text-lg font-semibold"
 											>
-												{t("Register Now")}
+												{t("Register Now ")}
 											</button>
 										</div>
 									)
 								) : (
 									<p className="text-center text-blue-700 text-lg font-medium">
-										{t("selectJob")}
+										{t("Select Job")}
 									</p>
 								)}
 							</div>
