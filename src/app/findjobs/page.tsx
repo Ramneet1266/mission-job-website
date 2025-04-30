@@ -56,7 +56,7 @@ interface Job {
 	state: string
 	salary: string
 	tags: string[]
-	createdAt: string
+	date: string // Using date as a string (e.g., "2025-04-29")
 	imageUrl: string
 	jobDescription: string
 	address: string
@@ -75,10 +75,10 @@ interface JobsAndCategories {
 	tags: string[]
 }
 
-const formatJobDate = (createdAt: string) => {
+const formatJobDate = (date: string) => {
 	try {
-		const date = new Date(createdAt)
-		return date.toLocaleDateString("en-US", {
+		const dateObj = new Date(date)
+		return dateObj.toLocaleDateString("en-US", {
 			year: "numeric",
 			month: "long",
 			day: "numeric",
@@ -113,7 +113,8 @@ const fetchJobsAndCategories =
 			)
 			postingsSnapshot.docs.forEach((doc) => {
 				const data = doc.data()
-				allJobs.push({
+				console.log(`Raw date for job ${doc.id}:`, data.date) // Log raw date value
+				const job = {
 					id: doc.id,
 					jobTitle: data.jobTitle || "Title Not Specified",
 					jobCompany: data.jobCompany || "",
@@ -121,9 +122,7 @@ const fetchJobsAndCategories =
 					state: data.state || "",
 					salary: data.salary || "",
 					tags: data.tags || [],
-					createdAt:
-						data.createdAt?.toDate?.().toISOString() ||
-						new Date().toISOString(),
+					date: data.date || new Date().toISOString().split("T")[0], // Use date as string, fallback to today
 					imageUrl: data.imageUrl || "",
 					jobDescription: data.jobDescription || "",
 					address: data.address || "",
@@ -131,7 +130,8 @@ const fetchJobsAndCategories =
 					contactEmail: data.contactEmail || "",
 					contactNumber: data.contactNumber || "",
 					postalCode: data.postalCode || "",
-				})
+				}
+				allJobs.push(job)
 				if (data.city) citiesSet.add(data.city)
 				if (data.state) statesSet.add(data.state)
 				if (data.jobCompany) companiesSet.add(data.jobCompany)
@@ -140,6 +140,11 @@ const fetchJobsAndCategories =
 				}
 			})
 		}
+
+		console.log(
+			"Fetched jobs date range:",
+			allJobs.map((job) => job.date)
+		)
 
 		return {
 			categories: categoriesData,
@@ -408,20 +413,13 @@ export default function JobFilterBar() {
 			)
 		})
 		.sort((a, b) => {
-			const getDate = (createdAt: string | any): number => {
-				if (!createdAt) return 0
-				if (typeof createdAt === "string") {
-					const date = new Date(createdAt)
-					return isNaN(date.getTime()) ? 0 : date.getTime()
-				}
-				if (createdAt?.toDate) {
-					return createdAt.toDate().getTime()
-				}
-				return 0
+			const getDate = (date: string): number => {
+				const dateObj = new Date(date)
+				return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime()
 			}
 
-			const dateA = getDate(a.createdAt)
-			const dateB = getDate(b.createdAt)
+			const dateA = getDate(a.date)
+			const dateB = getDate(b.date)
 
 			if (sortOrder === "latest") {
 				return dateB - dateA
@@ -508,7 +506,7 @@ export default function JobFilterBar() {
 			job.imageUrl && `**${t("Image")}:** ${job.imageUrl}`,
 			job.tags.length > 0 &&
 				`**${t("Skills")}:** ${job.tags.join(", ")}`,
-		].filter(Boolean) // Remove empty fields
+		].filter(Boolean)
 
 		return fields.join("\n")
 	}
@@ -868,7 +866,7 @@ export default function JobFilterBar() {
 															))}
 														</div>
 														<p className="text-xs text-gray-500 mt-1">
-															{formatJobDate(job.createdAt)}
+															{formatJobDate(job.date)}
 														</p>
 													</div>
 													{!user && (
@@ -974,7 +972,7 @@ export default function JobFilterBar() {
 																fill="currentColor"
 																viewBox="0 0 24 24"
 															>
-																<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.134.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.074-.149-.669-.669-.916-.983-.247-.314-.476-.558-.67-.588-.197-.03-.373-.03-.571-.03s-.518.074-.792.347c-.273.273-1.041.867-1.041 2.114s1.066 2.447 1.215 2.645c.149.198 2.095 3.196 5.077 4.487.708.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.099-.347-.347-.644-.496zM12 20.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5zm0-18A9.5 9.5 0 002.5 12a9.5 9.5 0 009.5 9.5 9.5 9.5 0 009.5-9.5A9.5 9.5 0 0012 2.5z" />
+																<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.134.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.074-.149-.669-.669-.916-.983-.247-.314-.476-.558-.67-.588-.197-.03-.373-.03-.571-.30s-.518.074-.792.347c-.273.273-1.041.867-1.041 2.114s1.066 2.447 1.215 2.645c.149.198 2.095 3.196 5.077 4.487.708.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.099-.347-.347-.644-.496zM12 20.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5zm0-18A9.5 9.5 0 002.5 12a9.5 9.5 0 009.5 9.5 9.5 9.5 0 009.5-9.5A9.5 9.5 0 0012 2.5z" />
 															</svg>
 														</button>
 														<button
