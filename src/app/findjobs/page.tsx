@@ -8,8 +8,6 @@ import React, {
 } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { ChevronDown, X, ArrowLeft, Download } from "lucide-react"
-// Optional: If you want to use ExternalLink icon instead of Download
-// import { ChevronDown, X, ArrowLeft, ExternalLink } from "lucide-react"
 import {
 	db,
 	collection,
@@ -18,7 +16,7 @@ import {
 	onAuthStateChanged,
 } from "../lib/firebase"
 import { User } from "firebase/auth"
-import useSWR from "swr"
+import useSWR, { SWRConfiguration } from "swr"
 import { useTranslation } from "react-i18next"
 import { TFunction } from "i18next"
 
@@ -188,14 +186,17 @@ export default function JobFilterBar() {
 	const [sortOrder, setSortOrder] = useState<
 		"default" | "latest" | "oldest"
 	>("default")
+	const [copied, setCopied] = useState(false)
+
+	const swrConfig: SWRConfiguration<JobsAndCategories> = {
+		revalidateOnFocus: false,
+		dedupingInterval: 60000,
+	}
 
 	const { data, error, isLoading } = useSWR<JobsAndCategories>(
 		"jobsAndCategories",
 		fetchJobsAndCategories,
-		{
-			revalidateOnFocus: false,
-			dedupingInterval: 60000,
-		}
+		swrConfig
 	)
 
 	useEffect(() => {
@@ -488,6 +489,90 @@ export default function JobFilterBar() {
 		window.open(imageUrl, "_blank")
 	}
 
+	const generateJobDescriptionMessage = (job: Job) => {
+		const fields = [
+			job.jobTitle && `**${t("Job Title")}:** ${job.jobTitle}`,
+			job.jobCompany && `**${t("Company")}:** ${job.jobCompany}`,
+			job.salary &&
+				job.salary.trim() !== "" &&
+				`**${t("Salary")}:** ${job.salary}`,
+			(job.city || job.state) &&
+				`**${t("Location")}:** ${job.city}${
+					job.state ? `, ${job.state}` : ""
+				}`,
+			job.address && `**${t("Address")}:** ${job.address}`,
+			job.jobDescription &&
+				`**${t("Description")}:** ${job.jobDescription}`,
+			job.contactEmail && `**${t("Email")}:** ${job.contactEmail}`,
+			job.contactNumber && `**${t("Phone")}:** ${job.contactNumber}`,
+			job.imageUrl && `**${t("Image")}:** ${job.imageUrl}`,
+			job.tags.length > 0 &&
+				`**${t("Skills")}:** ${job.tags.join(", ")}`,
+		].filter(Boolean) // Remove empty fields
+
+		return fields.join("\n")
+	}
+
+	const handleShare = (
+		platform: "whatsapp" | "facebook" | "linkedin" | "instagram",
+		job: Job
+	) => {
+		const message = generateJobDescriptionMessage(job)
+
+		switch (platform) {
+			case "whatsapp":
+				window.open(
+					`https://api.whatsapp.com/send?text=${encodeURIComponent(
+						message
+					)}`,
+					"_blank"
+				)
+				break
+			case "facebook":
+				navigator.clipboard.writeText(message).then(() => {
+					setCopied(true)
+					setTimeout(() => setCopied(false), 2000)
+					window.open(
+						"https://www.facebook.com/sharer/sharer.php?u=",
+						"_blank"
+					)
+					alert(
+						t(
+							"Please paste the copied job description into the Facebook post"
+						)
+					)
+				})
+				break
+			case "linkedin":
+				navigator.clipboard.writeText(message).then(() => {
+					setCopied(true)
+					setTimeout(() => setCopied(false), 2000)
+					window.open(
+						"https://www.linkedin.com/feed/?shareActive=true",
+						"_blank"
+					)
+					alert(
+						t(
+							"Please paste the copied job description into the LinkedIn post"
+						)
+					)
+				})
+				break
+			case "instagram":
+				navigator.clipboard.writeText(message).then(() => {
+					setCopied(true)
+					setTimeout(() => setCopied(false), 2000)
+					window.open("https://www.instagram.com", "_blank")
+					alert(
+						t(
+							"Please paste the copied job description into an Instagram post or story"
+						)
+					)
+				})
+				break
+		}
+	}
+
 	const Tag = ({
 		label,
 		onRemove,
@@ -514,7 +599,7 @@ export default function JobFilterBar() {
 		content: React.ReactNode
 	}) => (
 		<div className="mb-4">
-			<h3 className="text-1g font-semibold text-blue-900 mb-1">
+			<h3 className="text-lg font-semibold text-blue-900 mb-1">
 				{title}
 			</h3>
 			<div className="text-gray-700">{content}</div>
@@ -860,22 +945,89 @@ export default function JobFilterBar() {
 																	)
 																}
 																className="absolute top-2 right-2 p-2 cursor-pointer bg-white rounded-full shadow-md hover:bg-gray-100 transition-all duration-200 hover:opacity-80"
-																title={t("Open Image")} // Updated title
+																title={t("Open Image")}
 															>
 																<Download
 																	size={20}
 																	className="text-blue-600"
 																/>
-																{/* Optional: Use ExternalLink icon instead */}
-																{/* <ExternalLink size={20} className="text-blue-600" /> */}
 															</button>
 														</div>
 													)}
-													{fields.salary && (
-														<p className="text-sm text-blue-600">
-															{fields.salary}
-														</p>
-													)}
+													{fields.salary &&
+														fields.salary.trim() !== "" && (
+															<Section
+																title={t("salary")}
+																content={fields.salary}
+															/>
+														)}
+													<div className="flex gap-2 mt-2">
+														<button
+															onClick={() =>
+																handleShare("whatsapp", selectedJob)
+															}
+															className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-all duration-200"
+															title={t("Share on WhatsApp")}
+														>
+															<svg
+																className="w-5 h-5"
+																fill="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.134.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.074-.149-.669-.669-.916-.983-.247-.314-.476-.558-.67-.588-.197-.03-.373-.03-.571-.03s-.518.074-.792.347c-.273.273-1.041.867-1.041 2.114s1.066 2.447 1.215 2.645c.149.198 2.095 3.196 5.077 4.487.708.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.099-.347-.347-.644-.496zM12 20.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5zm0-18A9.5 9.5 0 002.5 12a9.5 9.5 0 009.5 9.5 9.5 9.5 0 009.5-9.5A9.5 9.5 0 0012 2.5z" />
+															</svg>
+														</button>
+														<button
+															onClick={() =>
+																handleShare("facebook", selectedJob)
+															}
+															className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200"
+															title={t("Share on Facebook")}
+														>
+															<svg
+																className="w-5 h-5"
+																fill="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+															</svg>
+														</button>
+														<button
+															onClick={() =>
+																handleShare("linkedin", selectedJob)
+															}
+															className="p-2 bg-blue-800 text-white rounded-full hover:bg-blue-900 transition-all duration-200"
+															title={t("Share on LinkedIn")}
+														>
+															<svg
+																className="w-5 h-5"
+																fill="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path d="M20.447 20.452h-3.554v-5.569c0-1.328-.024-3.037-1.85-3.037-1.85 0-2.133 1.448-2.133 2.944v5.662H9.354V9.5h3.414v1.56h.048c.475-.898 1.637-1.85 3.37-1.85 3.602 0 4.262 2.37 4.262 5.456v6.786zM5.337 8.433c-1.144 0-2.063-.92-2.063-2.056 0-1.135.92-2.056 2.063-2.056 1.135 0 2.056.921 2.056 2.056 0 1.136-.921 2.056-2.056 2.056zm1.778 12.019H3.56V9.5h3.555v11.952zM22.225 0H1.771C.792 0 0 .792 0 1.771v20.458C0 23.208.792 24 1.771 24h20.454c.979 0 1.771-.792 1.771-1.771V1.771C24 .792 23.208 0 22.225 0z" />
+															</svg>
+														</button>
+														<button
+															onClick={() =>
+																handleShare("instagram", selectedJob)
+															}
+															className="p-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-all duration-200 relative"
+															title={t("Share on Instagram")}
+														>
+															<svg
+																className="w-5 h-5"
+																fill="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.366.062 2.633.326 3.608 1.301.975.975 1.24 2.242 1.301 3.608.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.062 1.366-.326 2.633-1.301 3.608-.975.975-2.242 1.24-3.608 1.301-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-1.366-.062-2.633-.326-3.608-1.301-.975-.975-1.24-2.242-1.301-3.608-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.062-1.366.326-2.633 1.301-3.608.975-.975 2.242-1.24 3.608-1.301 1.266-.058 1.646-.07 4.85-.07zm0-2.163c-3.259 0-3.667.014-4.947.072-1.627.074-3.355.406-4.64 1.691-1.285 1.285-1.616 3.013-1.691 4.64-.058 1.28-.072 1.688-.072 4.947s.014 3.667.072 4.947c.074 1.627.406 3.355 1.691 4.64 1.285 1.285 3.013 1.616 4.64 1.691 1.28.058 1.688.072 4.947.072s3.667-.014 4.947-.072c1.627-.074 3.355-.406 4.64-1.691 1.285-1.285 1.616-3.013 1.691-4.64.058-1.28.072-1.688.072-4.947s-.014-3.667-.072-4.947c-.074-1.627-.406-3.355-1.691-4.64-1.285-1.285-3.013-1.616-4.64-1.691-1.28-.058-1.688-.072-4.947-.072zm0 5.838c-3.404 0-6.162 2.759-6.162 6.162s2.759 6.162 6.162 6.162 6.162-2.759 6.162-6.162-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.441s.645 1.441 1.441 1.441 1.441-.645 1.441-1.441-.645-1.441-1.441-1.441z" />
+															</svg>
+															{copied && (
+																<span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded">
+																	{t("Copied!")}
+																</span>
+															)}
+														</button>
+													</div>
 													{fields.location &&
 														fields.location !== ", " && (
 															<Section
